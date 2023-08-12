@@ -70,6 +70,8 @@ public class ChargePointService {
                 jsonClientUtility.sendJsonClientRequest(messageRequestFactory.createStopTransactionRequest());
                 Thread.sleep(500);
                 jsonClientUtility.sendJsonClientRequest(messageRequestFactory.createStatusNotification());
+                chargePointConfiguration.setTransactionId(null);
+                chargePointConfiguration.setIdTag(null);
             }
         } catch (Exception e) {
             log.error("Error happened while plugging out the charger, error message: {}", e.getLocalizedMessage());
