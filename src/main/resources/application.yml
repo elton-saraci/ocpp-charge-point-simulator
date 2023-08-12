@@ -1,0 +1,10 @@
+central-system-url: ws://dummy-central-system-url
+charge-point-id: TEST_CP_ID
+connector-id: 1
+charging-power: 5 #kWh. currently not being used.
+meter-values:
+  step: 200 #Wh increase per meter value. smart charging not supported yet.
+  frequency: 60 #in seconds. currently not being used.
+
+server:
+  port: 8080
