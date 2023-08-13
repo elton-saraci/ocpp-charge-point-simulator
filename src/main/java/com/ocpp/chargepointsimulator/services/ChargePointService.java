@@ -3,10 +3,7 @@ package com.ocpp.chargepointsimulator.services;
 import com.ocpp.chargepointsimulator.configurations.ChargePointConfiguration;
 import com.ocpp.chargepointsimulator.factories.MessageRequestFactory;
 import com.ocpp.chargepointsimulator.utilities.JsonClientUtility;
-import eu.chargetime.ocpp.model.core.AuthorizationStatus;
-import eu.chargetime.ocpp.model.core.AuthorizeConfirmation;
-import eu.chargetime.ocpp.model.core.AuthorizeRequest;
-import eu.chargetime.ocpp.model.core.ChargePointStatus;
+import eu.chargetime.ocpp.model.core.*;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -23,9 +20,10 @@ public class ChargePointService {
     public void plugTheChargerIn() {
         try {
             if (chargePointConfiguration.getChargePointStatus().equals(ChargePointStatus.Available)
-                    && chargePointConfiguration.getTransactionId() != null) {
+                    && chargePointConfiguration.getIdTag() != null) {
                 chargePointConfiguration.setChargePointStatus(ChargePointStatus.Charging);
-                jsonClientUtility.sendJsonClientRequest(messageRequestFactory.createStartTransactionRequest(chargePointConfiguration.getIdTag()));
+                StartTransactionConfirmation startTransactionConfirmation = (StartTransactionConfirmation) jsonClientUtility.sendJsonClientRequest(messageRequestFactory.createStartTransactionRequest(chargePointConfiguration.getIdTag()));
+                chargePointConfiguration.setTransactionId(startTransactionConfirmation.getTransactionId());
                 Thread.sleep(500);
                 jsonClientUtility.sendJsonClientRequest(messageRequestFactory.createStatusNotification());
             } else {

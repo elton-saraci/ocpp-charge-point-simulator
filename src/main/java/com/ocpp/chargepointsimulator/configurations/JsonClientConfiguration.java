@@ -45,9 +45,19 @@ public class JsonClientConfiguration {
                 log.info("Incoming TriggerMessageRequest -> {}", triggerMessageRequest);
                 switch (triggerMessageRequest.getRequestedMessage()) {
                     case BootNotification:
-                        jsonClient.send(messageRequestFactory.createBootNotification()); break;
+                        jsonClient.send(messageRequestFactory.createBootNotification());
+                        break;
                     case StatusNotification:
-                        jsonClient.send(messageRequestFactory.createStatusNotification()); break;
+                        jsonClient.send(messageRequestFactory.createStatusNotification());
+                        break;
+                    case MeterValues:
+                        if(chargePointConfiguration.getChargePointStatus().equals(ChargePointStatus.Charging)) {
+                            jsonClient.send(messageRequestFactory.createMeterValuesRequest());
+                        }
+                        break;
+                    case Heartbeat:
+                        jsonClient.send(new HeartbeatRequest());
+                        break;
                     default: log.info("The requested command not implemented yet."); break;
                 }
                 return new TriggerMessageConfirmation(TriggerMessageStatus.Accepted);
@@ -72,14 +82,14 @@ public class JsonClientConfiguration {
             public GetConfigurationConfirmation handleGetConfigurationRequest(GetConfigurationRequest request) {
                 log.info("Incoming GetConfigurationRequest -> {}", request);
                 // to be implemented
-                return null; // returning null since it's still a unsupported feature :(
+                return null; // Unsupported feature
             }
 
             @Override
             public ChangeConfigurationConfirmation handleChangeConfigurationRequest(ChangeConfigurationRequest request) {
                 log.info("Incoming ChangeConfigurationRequest -> {}", request);
                 // to be implemented
-                return null; // returning null since it's still a unsupported feature :(
+                return null; // Unsupported feature
             }
 
             @Override
@@ -92,14 +102,12 @@ public class JsonClientConfiguration {
             public DataTransferConfirmation handleDataTransferRequest(DataTransferRequest request) {
                 log.info("Incoming DataTransferRequest -> {}", request);
                 // to be implemented
-                return null; // returning null since it's still a unsupported feature :(
+                return null; // Unsupported feature
             }
 
             @Override
             public RemoteStartTransactionConfirmation handleRemoteStartTransactionRequest(RemoteStartTransactionRequest request) {
                 log.info("Incoming RemoteStartTransactionRequest -> {}", request);
-                //add the start transaction logic only if CP is available, reserved, preparing. otherwise return REJECTED
-                //don't forget the status notification after start transaction
                 List<ChargePointStatus> validChargePointStatuses = List.of(ChargePointStatus.Available, ChargePointStatus.Preparing, ChargePointStatus.Reserved);
                 ChargePointStatus currentChargePointStatus = chargePointConfiguration.getChargePointStatus();
                 if(!validChargePointStatuses.contains(currentChargePointStatus)) {
@@ -113,38 +121,42 @@ public class JsonClientConfiguration {
             @Override
             public RemoteStopTransactionConfirmation handleRemoteStopTransactionRequest(RemoteStopTransactionRequest request) {
                 log.info("Incoming RemoteStopTransactionRequest -> {}", request);
-                //add stop transaction logic only if CP is occupied. otherwise return REJECTED
-                //don't forget the status notification after stop transaction
                 ChargePointStatus currentChargePointStatus = chargePointConfiguration.getChargePointStatus();
                 if(!chargePointConfiguration.getChargePointStatus().equals(ChargePointStatus.Charging)) {
                     log.error("RemoteStopTransactionRequest rejected, invalid ChargePointStatus: {}", currentChargePointStatus);
                     return new RemoteStopTransactionConfirmation(RemoteStartStopStatus.Rejected);
-                } //check transactionId, make sure its correct
+                }
+                if(!chargePointConfiguration.getTransactionId().equals(request.getTransactionId())) {
+                    log.error("Wrong transaction id, rejecting the request.");
+                    return new RemoteStopTransactionConfirmation(RemoteStartStopStatus.Rejected);
+                }
                 sendDelayedStopTransaction(jsonClient);
                 return new RemoteStopTransactionConfirmation(RemoteStartStopStatus.Accepted);
             }
 
             @Override
             public ResetConfirmation handleResetRequest(ResetRequest request) {
-
                 log.info("Incoming ResetRequest -> {}", request);
-                // to be implemented
-
-                return null; // returning null means unsupported feature
+                sendDelayedStopTransaction(jsonClient);
+                return new ResetConfirmation(ResetStatus.Accepted); // returning null means unsupported feature
             }
 
             @Override
             public UnlockConnectorConfirmation handleUnlockConnectorRequest(UnlockConnectorRequest request) {
                 log.info("Incoming UnlockConnectorRequest -> {}", request);
                 chargePointConfiguration.setChargePointStatus(ChargePointStatus.Available);
+                sendDelayedStopTransaction(jsonClient);
                 return new UnlockConnectorConfirmation(UnlockStatus.Unlocked);
             }
         };
     }
 
     private void sendDelayedStartTransaction(JSONClient jsonClient, String idTag) {
-        Runnable jsonClientAsyncRunnableTask = () -> sendJsonClientRequests(jsonClient, idTag);
-        remoteExecutor.execute(jsonClientAsyncRunnableTask);
+        chargePointConfiguration.setIdTag(idTag);
+        if(chargePointConfiguration.getChargePointStatus().equals(ChargePointStatus.Preparing)) {
+            Runnable jsonClientAsyncRunnableTask = () -> sendJsonClientRequests(jsonClient, idTag);
+            remoteExecutor.execute(jsonClientAsyncRunnableTask);
+        }
     }
 
     private void sendJsonClientRequests(JSONClient jsonClient, String idTag) {
@@ -152,7 +164,7 @@ public class JsonClientConfiguration {
             Thread.sleep(3000);
             StartTransactionRequest startTransactionRequest = messageRequestFactory.createStartTransactionRequest(idTag);
             log.info("Triggering StartTransaction -> {}", startTransactionRequest);
-            StartTransactionConfirmation startTransactionConfirmation = (StartTransactionConfirmation) jsonClient.send(startTransactionRequest).toCompletableFuture().get();;
+            StartTransactionConfirmation startTransactionConfirmation = (StartTransactionConfirmation) jsonClient.send(startTransactionRequest).toCompletableFuture().get();
             chargePointConfiguration.setTransactionId(startTransactionConfirmation.getTransactionId());
             chargePointConfiguration.setChargePointStatus(ChargePointStatus.Charging);
             chargePointConfiguration.setIdTag(idTag);

@@ -5,14 +5,12 @@ import com.ocpp.chargepointsimulator.factories.MessageRequestFactory;
 import com.ocpp.chargepointsimulator.utilities.JsonClientUtility;
 import eu.chargetime.ocpp.model.core.ChargePointStatus;
 import eu.chargetime.ocpp.model.core.HeartbeatRequest;
-import eu.chargetime.ocpp.model.core.MeterValue;
-import eu.chargetime.ocpp.model.core.MeterValuesRequest;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
 
-@Configuration
+@Component
 @Slf4j
 @AllArgsConstructor
 public class MeterValuesScheduler {
@@ -21,14 +19,10 @@ public class MeterValuesScheduler {
     private final JsonClientUtility jsonClientUtility;
     private final MessageRequestFactory messageRequestFactory;
 
-    @Scheduled(fixedDelay = 60_000)
+    @Scheduled(fixedDelay = 15_000)
     public void generateMeterValues() {
         if(chargePointConfiguration.getChargePointStatus().equals(ChargePointStatus.Charging)) {
-            MeterValuesRequest meterValuesRequest = new MeterValuesRequest();
-            meterValuesRequest.setConnectorId(1);
-            meterValuesRequest.setTransactionId(chargePointConfiguration.getTransactionId());
-            meterValuesRequest.setMeterValue(new MeterValue[]{messageRequestFactory.meterValue()});
-            jsonClientUtility.sendJsonClientRequest(meterValuesRequest);
+            jsonClientUtility.sendJsonClientRequest(messageRequestFactory.createMeterValuesRequest());
         }
         if(chargePointConfiguration.isChargePointConnected()) {
             jsonClientUtility.sendJsonClientRequest(new HeartbeatRequest());

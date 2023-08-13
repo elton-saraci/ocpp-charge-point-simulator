@@ -62,6 +62,14 @@ public class MessageRequestFactory {
         return stopTransactionRequest;
     }
 
+    public MeterValuesRequest createMeterValuesRequest() {
+        MeterValuesRequest meterValuesRequest = new MeterValuesRequest();
+        meterValuesRequest.setConnectorId(chargePointConfiguration.getConnectorId());
+        meterValuesRequest.setTransactionId(chargePointConfiguration.getTransactionId());
+        meterValuesRequest.setMeterValue(new MeterValue[]{meterValue()});
+        return meterValuesRequest;
+    }
+
     public MeterValue meterValue() {
         MeterValue meterValue = new MeterValue();
         meterValue.setTimestamp(ZonedDateTime.now());
