@@ -11,13 +11,13 @@ You only need to specify the configurations on the application.yml file:
 - central-system-url: the url of the OCPP server
 - charge-point-id
 - connector-id (for now it only supports one single connector)
-- charging-power: currently not being used. No smart charging has not been implemented yet, so it will remain static the whole time.
-- meter-values.step: the amount of energy we want to send for every meter value.
+- charging-power: currently not being used. Smart charging has not been implemented yet, so the power value will remain static the whole time.
+- meter-values.step: the amount of energy in Wh we want to send for every meter value.
 - meter-values.frequency: it's supposed to be the initial meter value frequency; currently not being used.
 
 ## Dockerizing the app
 Run the following commands:
-- maven clean install
+- mvn clean install
 - docker build -t ocpp-simulator .
 - docker run -p 8080:8080 ocpp-simulator
 
@@ -26,6 +26,14 @@ Run the following commands:
 This project contains the Open API dependency and by default it runs locally on port 8080. <br /> 
 
 The API details can be found on the swagger ui: http://localhost:8080/swagger-ui/index.html#/
+
+## Next steps
+- Refactor the long files and get rid of code duplication
+- Add error handling (right now all the exceptions are being swallowed)
+- Write tests
+- Implement the smart charging feature
+- The meter value step MUST be calculated as time(hrs) * power(W)
+- Think of adding a database rather than storing the configurations during application runtime
 
 ## References
 - [OCPP OFFICIAL DOCUMENTATION](https://www.oasis-open.org/committees/download.php/58944/ocpp-1.6.pdf)
