@@ -15,6 +15,12 @@ You only need to specify the configurations on the application.yml file:
 - meter-values.step: the amount of energy we want to send for every meter value.
 - meter-values.frequency: it's supposed to be the initial meter value frequency; currently not being used.
 
+## Dockerizing the app
+Run the following commands:
+- maven clean install
+- docker build -t ocpp-simulator .
+- docker run -p 8080:8080 ocpp-simulator
+
 
 ## API documentation
 This project contains the Open API dependency and by default it runs locally on port 8080. <br /> 
