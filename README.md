@@ -28,6 +28,8 @@ This project contains the Open API dependency and by default it runs locally on 
 The API details can be found on the swagger ui: http://localhost:8080/swagger-ui/index.html#/
 
 ## Next steps
+- Add the logic for SUSPENDED connector status
+- Send authorization request after the remote start approval
 - Refactor the long files and get rid of code duplication
 - Add error handling (right now all the exceptions are being swallowed)
 - Write tests
