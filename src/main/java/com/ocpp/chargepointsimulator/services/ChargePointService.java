@@ -52,9 +52,15 @@ public class ChargePointService {
 
     private void conductChargePointStatusTransitions(String idTag) throws InterruptedException {
         if(chargePointConfiguration.getChargePointStatus().equals(ChargePointStatus.Preparing)) {
-            jsonClientUtility.sendJsonClientRequest(messageRequestFactory.createStartTransactionRequest(idTag));
-            Thread.sleep(500);
+            chargePointConfiguration.setChargePointStatus(ChargePointStatus.Charging);
             jsonClientUtility.sendJsonClientRequest(messageRequestFactory.createStatusNotification());
+            Thread.sleep(500);
+            StartTransactionConfirmation startTransactionConfirmation = (StartTransactionConfirmation) jsonClientUtility.sendJsonClientRequest(messageRequestFactory.createStartTransactionRequest(idTag));
+            chargePointConfiguration.setTransactionId(startTransactionConfirmation.getTransactionId());
+            chargePointConfiguration.setIdTag(idTag);
+
+        } else {
+            chargePointConfiguration.setIdTag(idTag);
         }
     }
 
