@@ -33,7 +33,7 @@ The API details can be found on the swagger ui: http://localhost:8080/swagger-ui
 - Refactor the long files and get rid of code duplication
 - Add error handling (right now all the exceptions are being swallowed)
 - Write tests
-- Implement the smart charging feature
+- Implement the smart charging feature, change configuration and change availability
 - The meter value step MUST be calculated as time(hrs) * power(W)
 - Think of adding a database rather than storing the configurations during application runtime
 
