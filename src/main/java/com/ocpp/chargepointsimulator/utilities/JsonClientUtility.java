@@ -1,5 +1,6 @@
 package com.ocpp.chargepointsimulator.utilities;
 
+import com.ocpp.chargepointsimulator.configurations.ChargePointConfiguration;
 import eu.chargetime.ocpp.JSONClient;
 import eu.chargetime.ocpp.OccurenceConstraintException;
 import eu.chargetime.ocpp.UnsupportedFeatureException;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Component;
 public class JsonClientUtility {
 
     private final JSONClient jsonClient;
+    private final ChargePointConfiguration chargePointConfiguration;
 
     public Confirmation sendJsonClientRequest(Request request) {
         try {
@@ -28,8 +30,14 @@ public class JsonClientUtility {
             return null;
         } catch (Exception e) {
             log.error("Unknown error occurred while sending request -> {}", e.getLocalizedMessage());
+            retryServerConnection();
             return null;
         }
+    }
+
+    private void retryServerConnection() {
+        log.info("Retrying connection request to the server.");
+        jsonClient.connect(chargePointConfiguration.getCentralSystemUrl() + "/" + chargePointConfiguration.getChargePointId(), null);
     }
 
 }
