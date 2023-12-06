@@ -130,14 +130,14 @@ public class JsonClientConfiguration {
                     log.error("Wrong transaction id, rejecting the request.");
                     return new RemoteStopTransactionConfirmation(RemoteStartStopStatus.Rejected);
                 }
-                sendDelayedStopTransaction(jsonClient);
+                sendDelayedStopTransaction(jsonClient, ChargePointStatus.Preparing);
                 return new RemoteStopTransactionConfirmation(RemoteStartStopStatus.Accepted);
             }
 
             @Override
             public ResetConfirmation handleResetRequest(ResetRequest request) {
                 log.info("Incoming ResetRequest -> {}", request);
-                sendDelayedStopTransaction(jsonClient);
+                sendDelayedStopTransaction(jsonClient, ChargePointStatus.Available);
                 return new ResetConfirmation(ResetStatus.Accepted); // returning null means unsupported feature
             }
 
@@ -145,7 +145,7 @@ public class JsonClientConfiguration {
             public UnlockConnectorConfirmation handleUnlockConnectorRequest(UnlockConnectorRequest request) {
                 log.info("Incoming UnlockConnectorRequest -> {}", request);
                 chargePointConfiguration.setChargePointStatus(ChargePointStatus.Available);
-                sendDelayedStopTransaction(jsonClient);
+                sendDelayedStopTransaction(jsonClient, ChargePointStatus.Available);
                 return new UnlockConnectorConfirmation(UnlockStatus.Unlocked);
             }
         };
@@ -180,19 +180,19 @@ public class JsonClientConfiguration {
         }
     }
 
-    private void sendDelayedStopTransaction(JSONClient jsonClient) {
-        Runnable jsonClientAsyncRunnableTask = () -> sendJsonClientStopRequests(jsonClient);
+    private void sendDelayedStopTransaction(JSONClient jsonClient, ChargePointStatus chargePointStatus) {
+        Runnable jsonClientAsyncRunnableTask = () -> sendJsonClientStopRequests(jsonClient, chargePointStatus);
         remoteExecutor.execute(jsonClientAsyncRunnableTask);
     }
 
-    private void sendJsonClientStopRequests(JSONClient jsonClient) {
+    private void sendJsonClientStopRequests(JSONClient jsonClient, ChargePointStatus chargePointStatus) {
         try {
             Thread.sleep(3000);
             StopTransactionRequest stopTransactionRequest = messageRequestFactory.createStopTransactionRequest();
             log.info("Triggering StopTransactionRequest -> {}", stopTransactionRequest);
             jsonClient.send(stopTransactionRequest);
             chargePointConfiguration.setTransactionId(chargePointConfiguration.getTransactionId());
-            chargePointConfiguration.setChargePointStatus(ChargePointStatus.Available);
+            chargePointConfiguration.setChargePointStatus(chargePointStatus);
             Thread.sleep(200);
             StatusNotificationRequest statusNotificationRequest = messageRequestFactory.createStatusNotification();
             log.info("Triggering StatusNotification -> {}", statusNotificationRequest);
