@@ -3,13 +3,11 @@ package com.ocpp.chargepointsimulator.factories;
 import com.ocpp.chargepointsimulator.configurations.ChargePointConfiguration;
 import eu.chargetime.ocpp.model.core.*;
 import lombok.AllArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Configuration;
 
 import java.time.ZonedDateTime;
 
 @Configuration
-@Slf4j
 @AllArgsConstructor
 @SuppressWarnings("deprecation")
 public class MessageRequestFactory {
