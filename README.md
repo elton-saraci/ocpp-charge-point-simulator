@@ -36,6 +36,7 @@ The API details can be found on the swagger ui: http://localhost:8080/swagger-ui
 - Implement the smart charging feature, change configuration and change availability
 - The meter value step MUST be calculated as time(hrs) * power(W)
 - Think of adding a database rather than storing the configurations during application runtime
+- Add signed values
 
 ## References
 - [OCPP OFFICIAL DOCUMENTATION](https://www.oasis-open.org/committees/download.php/58944/ocpp-1.6.pdf)
