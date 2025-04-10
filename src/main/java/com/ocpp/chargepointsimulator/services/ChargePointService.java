@@ -66,10 +66,11 @@ public class ChargePointService {
 
     public void plugOutTheCharger() {
         try {
-            if (chargePointConfiguration.getChargePointStatus().equals(ChargePointStatus.Preparing)) {
+            ChargePointStatus chargePointStatus = chargePointConfiguration.getChargePointStatus();
+            if (chargePointStatus.equals(ChargePointStatus.Preparing) || chargePointStatus.equals(ChargePointStatus.Finishing)) {
                 chargePointConfiguration.setChargePointStatus(ChargePointStatus.Available);
                 jsonClientUtility.sendJsonClientRequest(messageRequestFactory.createStatusNotification());
-            } else if (chargePointConfiguration.getChargePointStatus().equals(ChargePointStatus.Charging)) {
+            } else if (chargePointStatus.equals(ChargePointStatus.Charging)) {
                 chargePointConfiguration.setChargePointStatus(ChargePointStatus.Available);
                 jsonClientUtility.sendJsonClientRequest(messageRequestFactory.createStopTransactionRequest());
                 Thread.sleep(500);
