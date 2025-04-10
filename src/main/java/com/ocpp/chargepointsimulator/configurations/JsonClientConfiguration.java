@@ -130,7 +130,7 @@ public class JsonClientConfiguration {
                     log.error("Wrong transaction id, rejecting the request.");
                     return new RemoteStopTransactionConfirmation(RemoteStartStopStatus.Rejected);
                 }
-                sendDelayedStopTransaction(jsonClient, ChargePointStatus.Preparing);
+                sendDelayedStopTransaction(jsonClient, ChargePointStatus.Finishing);
                 return new RemoteStopTransactionConfirmation(RemoteStartStopStatus.Accepted);
             }
 
