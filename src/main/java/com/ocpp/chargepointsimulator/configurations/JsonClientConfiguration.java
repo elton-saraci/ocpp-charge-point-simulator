@@ -108,7 +108,7 @@ public class JsonClientConfiguration {
             @Override
             public RemoteStartTransactionConfirmation handleRemoteStartTransactionRequest(RemoteStartTransactionRequest request) {
                 log.info("Incoming RemoteStartTransactionRequest -> {}", request);
-                List<ChargePointStatus> validChargePointStatuses = List.of(ChargePointStatus.Available, ChargePointStatus.Preparing, ChargePointStatus.Reserved);
+                List<ChargePointStatus> validChargePointStatuses = List.of(ChargePointStatus.Available, ChargePointStatus.Preparing, ChargePointStatus.Reserved, ChargePointStatus.Finishing);
                 ChargePointStatus currentChargePointStatus = chargePointConfiguration.getChargePointStatus();
                 if(!validChargePointStatuses.contains(currentChargePointStatus)) {
                     log.error("RemoteStartTransactionRequest rejected, invalid ChargePointStatus: {}", currentChargePointStatus);
