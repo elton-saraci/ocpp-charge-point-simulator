@@ -153,7 +153,8 @@ public class JsonClientConfiguration {
 
     private void sendDelayedStartTransaction(JSONClient jsonClient, String idTag) {
         chargePointConfiguration.setIdTag(idTag);
-        if(chargePointConfiguration.getChargePointStatus().equals(ChargePointStatus.Preparing)) {
+        if(chargePointConfiguration.getChargePointStatus().equals(ChargePointStatus.Preparing) ||
+           chargePointConfiguration.getChargePointStatus().equals(ChargePointStatus.Finishing)) {
             Runnable jsonClientAsyncRunnableTask = () -> sendJsonClientRequests(jsonClient, idTag);
             remoteExecutor.execute(jsonClientAsyncRunnableTask);
         }
