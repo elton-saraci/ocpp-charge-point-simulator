@@ -1,7 +1,25 @@
-FROM adoptopenjdk/openjdk11:latest
+# ---------- Build stage ----------
+FROM maven:3.9-eclipse-temurin-25 AS build
+WORKDIR /workspace
 
-ARG JAR_FILE=target/*.jar
+# Cache Maven dependencies by resolving them before copying sources
+COPY pom.xml .
+RUN mvn -B -q dependency:go-offline
 
-COPY ./target/charge-point-simulator-0.0.1-SNAPSHOT.jar app.jar
+# Copy sources and build the jar
+COPY src ./src
+RUN mvn -B -q package -DskipTests
 
-ENTRYPOINT ["java", "-jar", "/app.jar"]
+# ---------- Runtime stage ----------
+FROM eclipse-temurin:25-jre
+WORKDIR /app
+
+# Run as a non-root user (best practice)
+RUN groupadd --system app && useradd --system --gid app --home /app app
+
+COPY --from=build /workspace/target/*.jar /app/app.jar
+USER app
+
+EXPOSE 8080
+
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]

@@ -1,10 +1,14 @@
-central-system-url: ws://dummy-central-system-url
-charge-point-id: TEST_CP_ID
-connector-id: 1
-charging-power: 5 #kWh. currently not being used.
+# OCPP Central System (CSMS) settings.
+# The simulator connects to: <central-system-url>/<charge-point-id>
+# Set CENTRAL_SYSTEM_URL to your OCPP CSMS (e.g. wss://your-csms.example.com/OCPP16).
+central-system-url: ${CENTRAL_SYSTEM_URL:ws://localhost:8080}
+charge-point-id: ${CHARGE_POINT_ID:CP_SIM_001}
+connector-id: ${CONNECTOR_ID:1}
+charging-power: ${CHARGING_POWER:5} #kWh. currently not being used.
 meter-values:
-  step: 200 #Wh increase per meter value. smart charging not supported yet.
-  frequency: 60 #in seconds. currently not being used.
+  step: ${METER_VALUES_STEP:200} #Wh increase per meter value. smart charging not supported yet.
+  frequency: ${METER_VALUES_FREQUENCY:60} #in seconds. currently not being used.
 
 server:
-  port: 8080
+  # Bind to the PORT env var when provided (e.g. by container platforms); fall back to 8080 for local runs.
+  port: ${PORT:8080}
