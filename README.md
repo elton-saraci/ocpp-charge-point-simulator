@@ -61,7 +61,3 @@ The API details can be found on the swagger ui: http://localhost:8080/swagger-ui
 ## References
 - [OCPP OFFICIAL DOCUMENTATION](https://www.oasis-open.org/committees/download.php/58944/ocpp-1.6.pdf)
 - [OCPP client-server library](https://github.com/ChargeTimeEU/Java-OCA-OCPP)
-
-## References
-- [OCPP OFFICIAL DOCUMENTATION](https://www.oasis-open.org/committees/download.php/58944/ocpp-1.6.pdf)
-- [OCPP client-server library](https://github.com/ChargeTimeEU/Java-OCA-OCPP)
