@@ -11,11 +11,13 @@ import eu.chargetime.ocpp.feature.profile.ClientRemoteTriggerProfile;
 import eu.chargetime.ocpp.model.core.*;
 import eu.chargetime.ocpp.model.remotetrigger.TriggerMessageConfirmation;
 import eu.chargetime.ocpp.model.remotetrigger.TriggerMessageStatus;
+import eu.chargetime.ocpp.wss.BaseWssSocketBuilder;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import javax.net.ssl.SSLContext;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -36,7 +38,17 @@ public class JsonClientConfiguration {
         ClientRemoteTriggerProfile clientRemoteTriggerProfile = new ClientRemoteTriggerProfile(clientRemoteTriggerEventHandlerConfiguration(jsonClient));
         jsonClient.addFeatureProfile(clientRemoteTriggerProfile);
         jsonClient.addFeatureProfile(clientCoreProfileConfig);
+        enableWSS(jsonClient);
         return jsonClient;
+    }
+
+    private void enableWSS(JSONClient jsonClient) {
+        try {
+            jsonClient.enableWSS(BaseWssSocketBuilder.builder()
+                    .sslSocketFactory(SSLContext.getDefault().getSocketFactory()));
+        } catch (Exception e) {
+            log.error("Error while enabling WSS support: {}", e.getLocalizedMessage());
+        }
     }
 
     public ClientRemoteTriggerEventHandler clientRemoteTriggerEventHandlerConfiguration(JSONClient jsonClient) {
