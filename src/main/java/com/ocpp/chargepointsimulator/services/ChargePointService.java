@@ -1,86 +1,85 @@
 package com.ocpp.chargepointsimulator.services;
 
-import com.ocpp.chargepointsimulator.configurations.ChargePointConfiguration;
-import com.ocpp.chargepointsimulator.factories.MessageRequestFactory;
-import com.ocpp.chargepointsimulator.utilities.JsonClientUtility;
-import eu.chargetime.ocpp.model.core.*;
-import lombok.AllArgsConstructor;
+import com.ocpp.chargepointsimulator.domain.AuthorizationOutcome;
+import com.ocpp.chargepointsimulator.domain.ChargePointConfig;
+import com.ocpp.chargepointsimulator.domain.ChargePointSession;
+import com.ocpp.chargepointsimulator.domain.ConnectorState;
+import com.ocpp.chargepointsimulator.ocpp.ChargePointConnectionManager;
+import com.ocpp.chargepointsimulator.ocpp.ChargePointSessionFactory;
+import com.ocpp.chargepointsimulator.registry.ChargePointRegistry;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
+/**
+ * Lifecycle of the simulated charge points: registering, listing, connecting, disconnecting and
+ * removing them, plus the connector operations exposed over HTTP.
+ */
 @Service
 @Slf4j
-@AllArgsConstructor
+@RequiredArgsConstructor
 public class ChargePointService {
 
-    private final JsonClientUtility jsonClientUtility;
-    private final ChargePointConfiguration chargePointConfiguration;
-    private final MessageRequestFactory messageRequestFactory;
+    private final ChargePointRegistry registry;
+    private final ChargePointSessionFactory sessionFactory;
+    private final ChargePointConnectionManager connectionManager;
+    private final TransactionService transactionService;
 
-    public void plugTheChargerIn() {
-        try {
-            if (chargePointConfiguration.getChargePointStatus().equals(ChargePointStatus.Available)
-                    && chargePointConfiguration.getIdTag() != null) {
-                chargePointConfiguration.setChargePointStatus(ChargePointStatus.Charging);
-                StartTransactionConfirmation startTransactionConfirmation = (StartTransactionConfirmation) jsonClientUtility.sendJsonClientRequest(messageRequestFactory.createStartTransactionRequest(chargePointConfiguration.getIdTag()));
-                chargePointConfiguration.setTransactionId(startTransactionConfirmation.getTransactionId());
-                Thread.sleep(500);
-                jsonClientUtility.sendJsonClientRequest(messageRequestFactory.createStatusNotification());
-            } else {
-                chargePointConfiguration.setChargePointStatus(ChargePointStatus.Preparing);
-                jsonClientUtility.sendJsonClientRequest(messageRequestFactory.createStatusNotification());
-            }
-        } catch (Exception e) {
-            log.error("Error happened while plugging in the charger, error message: {}", e.getLocalizedMessage());
+    /**
+     * Creates and registers a charge point, optionally opening its WebSocket connection right away.
+     *
+     * @throws com.ocpp.chargepointsimulator.exceptions.ChargePointAlreadyExistsException when the id is taken
+     */
+    public ChargePointSession register(ChargePointConfig config, boolean connect) {
+        ChargePointSession session = sessionFactory.create(config);
+        registry.add(session);
+        log.info("Charge point '{}' registered with connectors {}, charging power {} W, metering every {}s.",
+                config.chargePointId(), config.connectorIds(), config.chargingPower(), config.meterValuesFrequency());
+        if (connect) {
+            connectionManager.connect(session);
         }
+        return session;
     }
 
-    public void triggerAuthorizationRequest(String idTag) {
-        try {
-            AuthorizeConfirmation authorizeConfirmation = (AuthorizeConfirmation) jsonClientUtility
-                    .sendJsonClientRequest(new AuthorizeRequest(idTag));
-            if(authorizeConfirmation.getIdTagInfo().getStatus().equals(AuthorizationStatus.Accepted)) {
-                log.info("AuthorizeRequest accepted by the server.");
-                conductChargePointStatusTransitions(idTag);
-            } else {
-                log.warn("The server rejected the AuthorizationRequest.");
-            }
-        } catch (Exception e) {
-            log.error("Error happened while handling authorization request for rfid use-case, error message: " + e.getLocalizedMessage());
-        }
+    public ChargePointSession get(String chargePointId) {
+        return registry.get(chargePointId);
     }
 
-    private void conductChargePointStatusTransitions(String idTag) throws InterruptedException {
-        if(chargePointConfiguration.getChargePointStatus().equals(ChargePointStatus.Preparing)) {
-            chargePointConfiguration.setChargePointStatus(ChargePointStatus.Charging);
-            jsonClientUtility.sendJsonClientRequest(messageRequestFactory.createStatusNotification());
-            Thread.sleep(500);
-            StartTransactionConfirmation startTransactionConfirmation = (StartTransactionConfirmation) jsonClientUtility.sendJsonClientRequest(messageRequestFactory.createStartTransactionRequest(idTag));
-            chargePointConfiguration.setTransactionId(startTransactionConfirmation.getTransactionId());
-            chargePointConfiguration.setIdTag(idTag);
-
-        } else {
-            chargePointConfiguration.setIdTag(idTag);
-        }
+    public List<ChargePointSession> list() {
+        return List.copyOf(registry.all());
     }
 
-    public void plugOutTheCharger() {
-        try {
-            ChargePointStatus chargePointStatus = chargePointConfiguration.getChargePointStatus();
-            if (chargePointStatus.equals(ChargePointStatus.Preparing) || chargePointStatus.equals(ChargePointStatus.Finishing)) {
-                chargePointConfiguration.setChargePointStatus(ChargePointStatus.Available);
-                jsonClientUtility.sendJsonClientRequest(messageRequestFactory.createStatusNotification());
-            } else if (chargePointStatus.equals(ChargePointStatus.Charging)) {
-                chargePointConfiguration.setChargePointStatus(ChargePointStatus.Available);
-                jsonClientUtility.sendJsonClientRequest(messageRequestFactory.createStopTransactionRequest());
-                Thread.sleep(500);
-                jsonClientUtility.sendJsonClientRequest(messageRequestFactory.createStatusNotification());
-                chargePointConfiguration.setTransactionId(null);
-                chargePointConfiguration.setIdTag(null);
-            }
-        } catch (Exception e) {
-            log.error("Error happened while plugging out the charger, error message: {}", e.getLocalizedMessage());
-        }
+    public void connect(String chargePointId) {
+        connectionManager.connect(registry.get(chargePointId));
     }
 
+    /** @throws com.ocpp.chargepointsimulator.exceptions.ConnectorNotFoundException when the connector is not exposed. */
+    public ConnectorState getConnector(String chargePointId, int connectorId) {
+        return registry.get(chargePointId).getConnector(connectorId);
+    }
+
+    public void disconnect(String chargePointId) {
+        connectionManager.disconnect(registry.get(chargePointId));
+    }
+
+    /** Disconnects and forgets a charge point. */
+    public void remove(String chargePointId) {
+        ChargePointSession session = registry.remove(chargePointId);
+        connectionManager.disconnectQuietly(session);
+        log.info("Charge point '{}' removed.", chargePointId);
+    }
+
+    public ConnectorState plugIn(String chargePointId, Integer connectorId) {
+        return transactionService.plugIn(registry.get(chargePointId), connectorId);
+    }
+
+    public ConnectorState plugOut(String chargePointId, Integer connectorId) {
+        return transactionService.plugOut(registry.get(chargePointId), connectorId);
+    }
+
+    public AuthorizationOutcome authorize(String chargePointId, Integer connectorId, String idTag) {
+        return transactionService.authorize(registry.get(chargePointId), connectorId, idTag);
+    }
 }

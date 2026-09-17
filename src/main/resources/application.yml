@@ -1,13 +1,26 @@
-# OCPP Central System (CSMS) settings.
-# The simulator connects to: <central-system-url>/<charge-point-id>
-# Set CENTRAL_SYSTEM_URL to your OCPP CSMS (e.g. wss://your-csms.example.com/OCPP16).
-central-system-url: ${CENTRAL_SYSTEM_URL:ws://localhost:8080}
-charge-point-id: ${CHARGE_POINT_ID:CP_SIM_001}
-connector-id: ${CONNECTOR_ID:1}
-charging-power: ${CHARGING_POWER:5} #kWh. currently not being used.
-meter-values:
-  step: ${METER_VALUES_STEP:200} #Wh increase per meter value. smart charging not supported yet.
-  frequency: ${METER_VALUES_FREQUENCY:60} #in seconds. currently not being used.
+# OCPP charge point simulator settings.
+#
+# Charge points are normally created at runtime over the REST API (POST /api/charge-points). The
+# values below are the defaults for the fields an HTTP request leaves out, and they describe the
+# optional charge point that is registered automatically on startup.
+simulator:
+  defaults:
+    # When set, one charge point with this id is registered and connected on startup.
+    # Leave empty to start with an empty registry and create charge points over HTTP.
+    charge-point-id: ${CHARGE_POINT_ID:}
+    # The simulator connects to <central-system-url>/<charge-point-id>.
+    central-system-url: ${CENTRAL_SYSTEM_URL:ws://localhost:8080}
+    # Connectors of a charge point, comma separated, e.g. "1,2,3".
+    # CONNECTOR_ID is still honoured for single connector deployments.
+    connector-ids: ${CONNECTOR_IDS:${CONNECTOR_ID:1}}
+    # Charging power in Watt, shared by all connectors of a charge point.
+    # The meter value step is derived from it: Wh = W * (metering interval seconds / 3600).
+    charging-power: ${CHARGING_POWER:5000}
+    # Seconds between two MeterValues messages of a charging connector.
+    meter-values-frequency: ${METER_VALUES_FREQUENCY:60}
+    # Optional HTTP Basic credentials for the OCPP WebSocket handshake; set both or neither.
+    username: ${OCPP_USERNAME:}
+    password: ${OCPP_PASSWORD:}
 
 server:
   # Bind to the PORT env var when provided (e.g. by container platforms); fall back to 8080 for local runs.

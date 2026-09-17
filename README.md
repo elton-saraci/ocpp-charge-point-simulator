@@ -1,61 +1,100 @@
 # ocpp-charge-point-simulator
 
-## Introduction:
-A charge point simulator based on the OCPP protocol.<br />
-This simulator has been built using an [OCPP client-server Springboot library](https://github.com/ChargeTimeEU/Java-OCA-OCPP).
-Once you run the application it connects to the server URL that is defined on the application.yml file (or via the `CENTRAL_SYSTEM_URL` / `CHARGE_POINT_ID` environment variables). This connection takes place in the StartupConfiguration.java file, where we also do the initialization of our fake charge point settings. Once connected, the simulator sends a `BootNotification` to register the charge point.
+An OCPP 1.6 charge point simulator built on the [Java-OCA-OCPP](https://github.com/ChargeTimeEU/Java-OCA-OCPP) library.
+
+One instance runs **any number of charge points**. Each has its own WebSocket connection to the central system, its own
+connectors and, optionally, its own HTTP Basic credentials. Charge points are created, inspected and driven over the
+REST API while the application runs, so you no longer need a container per charge point.
 
 ## How to run it locally
-The project specs: Java 25, Springboot version 3.5.16 <br /> 
-You only need to specify the configurations on the application.yml file (every value can also be overridden via environment variables, all have defaults in `application.yml`):
-- central-system-url: the url of the OCPP server (CSMS). The simulator connects to `<central-system-url>/<charge-point-id>` (env: `CENTRAL_SYSTEM_URL`)
-- charge-point-id (env: `CHARGE_POINT_ID`)
-- connector-id: for now it only supports one single connector (env: `CONNECTOR_ID`)
-- charging-power: currently not being used. Smart charging has not been implemented yet, so the power value will remain static the whole time (env: `CHARGING_POWER`)
-- meter-values.step: the amount of energy in Wh we want to send for every meter value (env: `METER_VALUES_STEP`)
-- meter-values.frequency: it's supposed to be the initial meter value frequency; currently not being used (env: `METER_VALUES_FREQUENCY`)
+
+Project specs: Java 25, Spring Boot 3.5.16.
+
+```bash
+./mvnw spring-boot:run
+```
+
+Without `CHARGE_POINT_ID` the simulator starts with an empty registry and you create charge points over HTTP. Set it to
+keep the single charge point behaviour, where one charge point is registered and connected on startup.
+
+## Configuring charge points
+
+A charge point definition is a small JSON document: id, central system URL, optional credentials, charging power in
+Watt, metering frequency in seconds and the connector ids it exposes, for example:
+
+```bash
+curl -X POST localhost:8080/api/charge-points -H 'Content-Type: application/json' -d '{
+  "chargePointId": "CP_1",
+  "centralSystemUrl": "ws://localhost:8080",
+  "chargingPower": 11000,
+  "meterValuesFrequency": 30,
+  "connectorIds": [1, 2]
+}'
+```
+
+The API covers the whole lifecycle (register, list, connect, disconnect, remove) and the connector operations
+(plug-in, plug-out, RFID authorization). Every endpoint, its parameters and the available body fields are documented in
+the Swagger UI at `http://localhost:8080/swagger-ui/index.html`.
+
+### Defaults
+
+Everything has a default in `application.yml` under `simulator.defaults`, used for the startup charge point and for the
+fields a request leaves out:
+
+| Env var | Default | Notes |
+| --- | --- | --- |
+| `CHARGE_POINT_ID` | *(empty)* | Empty means: start with no charge point. |
+| `CENTRAL_SYSTEM_URL` | `ws://localhost:8080` | |
+| `CONNECTOR_IDS` | `1` | Comma separated, e.g. `1,2`. `CONNECTOR_ID` still works. |
+| `CHARGING_POWER` | `5000` | Watt. |
+| `METER_VALUES_FREQUENCY` | `60` | Seconds. |
+| `OCPP_USERNAME` / `OCPP_PASSWORD` | *(empty)* | Optional HTTP Basic auth. |
+| `PORT` | `8080` | HTTP port of the simulator itself. |
+
+`METER_VALUES_STEP` no longer exists: the meter value step is calculated, not configured.
+
+## Behaviour worth knowing
+
+- **Meter values follow physics.** Energy is power over time, $E[\text{Wh}] = P[\text{W}] \cdot t[\text{s}] / 3600$. At
+  11 kW with a 30 s interval the register grows by 92 Wh per `MeterValues` message. Each charge point reports on its
+  own frequency; heartbeats are sent every 15 seconds.
+- **Connectors are independent.** Status, id tag, transaction id and meter register are tracked per connector, so one
+  connector can charge while another is available.
+- **Authentication** uses the library's own support: `username` + `password` become the HTTP Basic credentials of the
+  OCPP handshake. Credentials are never returned by the API, only an `authenticated` flag.
+- **Failures are not swallowed.** API errors come back as Problem Details (`400` invalid definition, `404` unknown
+  charge point or connector, `409` duplicate or not connected, `502` central system unreachable or rejecting).
+  Failures with no caller, such as incoming OCPP requests, scheduled metering or a failed connection attempt, are
+  logged with their stack trace and exposed as `lastError` on the charge point.
+- **Connections are not retried silently.** A dropped connection is reported as disconnected, and reconnecting is an
+  explicit call.
 
 ## Dockerizing the app
-The included `Dockerfile` is a multi-stage build: it compiles the project with Maven and produces a slim JRE runtime image, so you do **not** need to build the jar beforehand.
 
-Run the following commands:
-- docker build -t ocpp-simulator .
-- docker run -p 8080:8080 -e CHARGE_POINT_ID=CP_SIM_001 ocpp-simulator
+The `Dockerfile` is a multi-stage build, so the jar is built for you:
 
-The simulator will connect to `<CENTRAL_SYSTEM_URL>/<CHARGE_POINT_ID>` and keep the connection alive by sending OCPP Heartbeats every 15 seconds.
+```bash
+docker build -t ocpp-simulator .
+docker run -p 8080:8080 -e CENTRAL_SYSTEM_URL=ws://host.docker.internal:8080 -e CHARGE_POINT_ID=CP_SIM_001 ocpp-simulator
+```
 
-## Deploying with Docker
-The Dockerfile can be deployed to any container platform (Render, Heroku, Fly.io, AWS, Azure, ...).
+The connection to the central system is outbound, so no inbound firewall rules are needed.
 
-1. Build the image: `docker build -t ocpp-simulator .`
-2. Run it with the required environment variables (all have defaults in `application.yml`):
-   - `CENTRAL_SYSTEM_URL` — the OCPP central system (CSMS) URL
-   - `CHARGE_POINT_ID` — use a unique id per charge point instance
-   - `CONNECTOR_ID` — default `1`
-   - `CHARGING_POWER` — default `5`
-   - `METER_VALUES_STEP` — default `200`
-   - `METER_VALUES_FREQUENCY` — default `60`
-3. Expose the app's HTTP port: the app binds to a `PORT` environment variable when set, otherwise it defaults to `8080`.
+## Tests
 
-Notes:
-- The connection to the central system is **outbound** (the simulator is a WebSocket client), so no inbound firewall rules are needed.
-- The app also runs its own HTTP server exposing the Swagger UI at `/swagger-ui/index.html` and the charge point control endpoints under `/api/charge-point/...` (plug-in, rfid, plug-out).
-- To deploy multiple charge points, deploy one instance per charge point and give each a unique `CHARGE_POINT_ID`.
+```bash
+./mvnw test
+```
 
-## API documentation
-This project contains the Open API dependency and by default it runs locally on port 8080. <br /> 
-
-The API details can be found on the swagger ui: http://localhost:8080/swagger-ui/index.html#/
+Covers the metering formula, charge point validation, the registry, the REST API including its status mapping, and real
+WebSocket connections (several charge points in parallel, the `ocpp1.6` subprotocol, BootNotification and Basic auth).
 
 ## Next steps
 - Add the logic for SUSPENDED connector status
-- Send authorization request after the remote start approval
-- Refactor the long files and get rid of code duplication
-- Add error handling (right now all the exceptions are being swallowed)
-- Write tests
-- Implement the smart charging feature, change configuration and change availability
-- The meter value step MUST be calculated as time(hrs) * power(W)
-- Think of adding a database rather than storing the configurations during application runtime
+- Send an authorization request after a remote start approval
+- Optional auto-reconnect for dropped connections
+- Implement smart charging, change configuration and change availability
+- Persist charge point definitions so they survive a restart
 - Add signed values
 
 ## References
