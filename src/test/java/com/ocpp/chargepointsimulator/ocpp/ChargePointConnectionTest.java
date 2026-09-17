@@ -33,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * connection handling, the parallel operation of several charge points and the HTTP Basic
  * credentials of the OCPP handshake are verified against a real socket.
  */
-@SpringBootTest(properties = "simulator.defaults.charge-point-id=")
+@SpringBootTest
 class ChargePointConnectionTest {
 
     private static final int AWAIT_TIMEOUT_SECONDS = 10;

@@ -11,6 +11,10 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * The rules a charge point definition has to satisfy: what is accepted, what is normalised and what is
+ * rejected before a session is ever created.
+ */
 class ChargePointConfigTest {
 
     @Test
@@ -59,28 +63,46 @@ class ChargePointConfigTest {
     }
 
     @Test
-    void rejectsIncompleteOrInvalidDefinitions() {
-        // missing charge point id
+    void rejectsAMissingChargePointId() {
         assertThrows(InvalidChargePointConfigException.class, () -> new ChargePointConfig(
                 null, "ws://localhost:8080", null, null, 5000, 60, List.of(1)));
-        // charge point id with a slash, it would corrupt the URL
+    }
+
+    @Test
+    void rejectsAChargePointIdThatWouldCorruptTheSessionUrl() {
+        // a slash or a space would silently change which resource is dialled
         assertThrows(InvalidChargePointConfigException.class, () -> new ChargePointConfig(
                 "CP/1", "ws://localhost:8080", null, null, 5000, 60, List.of(1)));
-        // unsupported scheme
+        assertThrows(InvalidChargePointConfigException.class, () -> new ChargePointConfig(
+                "CP 1", "ws://localhost:8080", null, null, 5000, 60, List.of(1)));
+    }
+
+    @Test
+    void rejectsAnUnsupportedCentralSystemScheme() {
         assertThrows(InvalidChargePointConfigException.class, () -> new ChargePointConfig(
                 "CP_1", "http://localhost:8080", null, null, 5000, 60, List.of(1)));
-        // username without password
+        assertThrows(InvalidChargePointConfigException.class, () -> new ChargePointConfig(
+                "CP_1", null, null, null, 5000, 60, List.of(1)));
+    }
+
+    @Test
+    void rejectsHalfConfiguredCredentials() {
         assertThrows(InvalidChargePointConfigException.class, () -> new ChargePointConfig(
                 "CP_1", "ws://localhost:8080", "user", null, 5000, 60, List.of(1)));
-        // password without username
         assertThrows(InvalidChargePointConfigException.class, () -> new ChargePointConfig(
                 "CP_1", "ws://localhost:8080", null, "secret", 5000, 60, List.of(1)));
-        // power and frequency must be positive
+    }
+
+    @Test
+    void rejectsNonPositivePowerOrMeteringInterval() {
         assertThrows(InvalidChargePointConfigException.class,
                 () -> config("ws://localhost:8080", List.of(1), 0, 60));
         assertThrows(InvalidChargePointConfigException.class,
                 () -> config("ws://localhost:8080", List.of(1), 5000, 0));
-        // at least one connector, ids greater than zero and unique
+    }
+
+    @Test
+    void rejectsConnectorsThatAreMissingDuplicateOrNotPositive() {
         assertThrows(InvalidChargePointConfigException.class,
                 () -> config("ws://localhost:8080", List.of(), 5000, 60));
         assertThrows(InvalidChargePointConfigException.class,

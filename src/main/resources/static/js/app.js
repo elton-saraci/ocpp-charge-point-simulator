@@ -403,12 +403,11 @@
             </span>`).join('');
     }
 
-    function stationCard(station, index) {
+    function stationCard(station) {
         return `
-        <article class="card" data-id="${escapeHtml(station.chargePointId)}"
-                 style="animation-delay:${Math.min(index * 25, 200)}ms">
+        <article class="card" data-id="${escapeHtml(station.chargePointId)}">
             <header class="card__head">
-                <div style="min-width:0">
+                <div class="card__titles">
                     <div class="card__id">${escapeHtml(station.chargePointId)}</div>
                     <div class="card__url" title="${escapeHtml(station.webSocketUrl)}">${escapeHtml(station.webSocketUrl)}</div>
                 </div>
@@ -502,7 +501,7 @@
             <div><dt>Authentication</dt><dd>${station.authenticated ? 'HTTP Basic' : 'anonymous'}</dd></div>
             <div><dt>Connectors</dt><dd>${station.connectors.map((connector) => connector.connectorId).join(', ')}</dd></div>
             <div><dt>Metered</dt><dd>${formatKwh(totalWh(station))}</dd></div>
-            <div><dt>Last error</dt><dd style="color:${station.lastError ? 'var(--danger)' : 'var(--text-faint)'}">
+            <div><dt>Last error</dt><dd class="${station.lastError ? 'is-error' : 'is-muted'}">
                 ${escapeHtml(station.lastError ?? 'none')}</dd></div>`;
 
         dom.stationToggle.textContent = station.connected ? 'Disconnect' : 'Connect';

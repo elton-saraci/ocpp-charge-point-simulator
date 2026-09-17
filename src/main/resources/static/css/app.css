@@ -290,6 +290,14 @@ main {
     gap: var(--s-4);
 }
 
+/* cards rise in a wave; the stagger lives here so no inline style is interpolated in JS */
+.grid .card:nth-child(1) { animation-delay: 0ms; }
+.grid .card:nth-child(2) { animation-delay: 25ms; }
+.grid .card:nth-child(3) { animation-delay: 50ms; }
+.grid .card:nth-child(4) { animation-delay: 75ms; }
+.grid .card:nth-child(5) { animation-delay: 100ms; }
+.grid .card:nth-child(n + 6) { animation-delay: 125ms; }
+
 .card {
     position: relative;
     display: flex;
@@ -319,6 +327,7 @@ main {
     padding: var(--s-4);
     border-bottom: 1px solid var(--line);
 }
+.card__titles { min-width: 0; }
 .card__id {
     font-family: var(--mono);
     font-size: 14px;
@@ -580,6 +589,8 @@ input[aria-invalid="true"] { border-color: var(--danger); }
 }
 .kv dd { margin: 0; font-size: 13px; overflow-wrap: anywhere; }
 .kv dd.wrap-mono { font-family: var(--mono); font-size: 12px; }
+.kv dd.is-error { color: var(--danger); }
+.kv dd.is-muted { color: var(--text-faint); }
 
 /* ------------------------------------------------------------------ station */
 

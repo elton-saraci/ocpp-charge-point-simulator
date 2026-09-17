@@ -14,8 +14,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 
+import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -26,9 +26,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Exercises the configuration API. Charge points are registered without connecting, so no central
  * system is needed; operations that need the OCPP connection are asserted to fail with 409.
+ *
+ * <p>Each test cleans up after itself, so they can run in any order against one application context.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "simulator.defaults.charge-point-id=")
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class ChargePointControllerTest {
 
     @Autowired
@@ -77,13 +78,13 @@ class ChargePointControllerTest {
 
     @Test
     void listsAndReadsBackChargePoints() {
-        register(new ChargePointRequest("CP_TEST_4", null, null, null, null, null, List.of(1, 2), false));
+        register(requestWithConnectors("CP_TEST_4", 1, 2));
 
         ResponseEntity<ChargePointResponse[]> list =
                 restTemplate.getForEntity("/api/charge-points", ChargePointResponse[].class);
         assertEquals(HttpStatus.OK, list.getStatusCode());
         assertNotNull(list.getBody());
-        assertTrue(Stream.of(list.getBody())
+        assertTrue(Arrays.stream(list.getBody())
                 .anyMatch(chargePoint -> "CP_TEST_4".equals(chargePoint.chargePointId())));
 
         ResponseEntity<ChargePointResponse> detail =
@@ -97,10 +98,10 @@ class ChargePointControllerTest {
 
     @Test
     void rejectsADuplicateChargePointId() {
-        register(new ChargePointRequest("CP_TEST_5", null, null, null, null, null, null, false));
+        register(request("CP_TEST_5"));
 
         ResponseEntity<ProblemDetail> duplicate = restTemplate.postForEntity("/api/charge-points",
-                new ChargePointRequest("CP_TEST_5", null, null, null, null, null, null, false), ProblemDetail.class);
+                request("CP_TEST_5"), ProblemDetail.class);
         assertEquals(HttpStatus.CONFLICT, duplicate.getStatusCode());
 
         remove("CP_TEST_5");
@@ -119,16 +120,21 @@ class ChargePointControllerTest {
     }
 
     @Test
-    void reportsUnknownChargePointsAndConnectors() {
+    void reportsAnUnknownChargePoint() {
         ResponseEntity<ProblemDetail> unknownChargePoint = restTemplate.getForEntity(
                 "/api/charge-points/detail?cpId=CP_MISSING", ProblemDetail.class);
-        assertEquals(HttpStatus.NOT_FOUND, unknownChargePoint.getStatusCode());
 
-        register(new ChargePointRequest("CP_TEST_7", null, null, null, null, null, List.of(1), false));
+        assertEquals(HttpStatus.NOT_FOUND, unknownChargePoint.getStatusCode());
+    }
+
+    @Test
+    void reportsAnUnknownConnector() {
+        register(requestWithConnectors("CP_TEST_7", 1));
+
         ResponseEntity<ProblemDetail> unknownConnector = restTemplate.postForEntity(
                 "/api/charge-points/connectors/plug-in?cpId=CP_TEST_7&connectorId=9", null, ProblemDetail.class);
-        assertEquals(HttpStatus.NOT_FOUND, unknownConnector.getStatusCode());
 
+        assertEquals(HttpStatus.NOT_FOUND, unknownConnector.getStatusCode());
         remove("CP_TEST_7");
     }
 
@@ -155,22 +161,28 @@ class ChargePointControllerTest {
     }
 
     @Test
-    void rejectsAnUpdateThatRenamesAChargePointOrTargetsAnUnknownOne() {
-        register(new ChargePointRequest("CP_TEST_11", null, null, null, null, null, null, false));
+    void rejectsAnUpdateThatRenamesAChargePoint() {
+        register(request("CP_TEST_11"));
 
         ResponseEntity<ProblemDetail> renamed = restTemplate.exchange(
                 "/api/charge-points?cpId=CP_TEST_11", HttpMethod.PUT,
                 new HttpEntity<>(new ChargePointRequest("CP_OTHER", null, null, null, null, null, null, null)),
                 ProblemDetail.class);
-        assertEquals(HttpStatus.BAD_REQUEST, renamed.getStatusCode());
 
+        assertEquals(HttpStatus.BAD_REQUEST, renamed.getStatusCode());
+        assertEquals("CP_TEST_11", detail().chargePointId(), "the charge point must be left untouched");
+
+        remove("CP_TEST_11");
+    }
+
+    @Test
+    void rejectsAnUpdateOfAnUnknownChargePoint() {
         ResponseEntity<ProblemDetail> unknown = restTemplate.exchange(
                 "/api/charge-points?cpId=CP_MISSING", HttpMethod.PUT,
                 new HttpEntity<>(new ChargePointRequest("CP_MISSING", null, null, null, null, null, null, null)),
                 ProblemDetail.class);
-        assertEquals(HttpStatus.NOT_FOUND, unknown.getStatusCode());
 
-        remove("CP_TEST_11");
+        assertEquals(HttpStatus.NOT_FOUND, unknown.getStatusCode());
     }
 
     @Test
@@ -210,6 +222,25 @@ class ChargePointControllerTest {
         assertFalse(response.getBody().connected(),
                 "the test registers charge points without connecting them");
         return response.getBody();
+    }
+
+    /** Reads a charge point back over the API. */
+    private ChargePointResponse detail() {
+        ResponseEntity<ChargePointResponse> response = restTemplate.getForEntity(
+                "/api/charge-points/detail?cpId=" + "CP_TEST_11", ChargePointResponse.class);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        return response.getBody();
+    }
+
+    /** A definition that only sets the id, everything else falls back to the configured defaults. */
+    private ChargePointRequest request(String chargePointId) {
+        return new ChargePointRequest(chargePointId, null, null, null, null, null, null, false);
+    }
+
+    private ChargePointRequest requestWithConnectors(String chargePointId, Integer... connectorIds) {
+        return new ChargePointRequest(chargePointId, null, null, null, null, null,
+                List.of(connectorIds), false);
     }
 
     private void remove(String chargePointId) {
