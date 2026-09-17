@@ -133,6 +133,47 @@ class ChargePointControllerTest {
     }
 
     @Test
+    void updatesAChargePointInPlace() {
+        register(new ChargePointRequest("CP_TEST_10", "ws://localhost:9999", null, null, 5000, 60, List.of(1), false));
+
+        ResponseEntity<ChargePointResponse> response = restTemplate.exchange(
+                "/api/charge-points?cpId=CP_TEST_10", HttpMethod.PUT,
+                new HttpEntity<>(new ChargePointRequest("CP_TEST_10", "ws://localhost:9999", null, null,
+                        22000, 15, List.of(1, 2), null)),
+                ChargePointResponse.class);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(22000, response.getBody().chargingPower());
+        assertEquals(15, response.getBody().meterValuesFrequency());
+        assertEquals(List.of(1, 2), response.getBody().connectors().stream()
+                .map(ConnectorResponse::connectorId).toList());
+        // connect was omitted, so the charge point keeps its current state: still disconnected
+        assertFalse(response.getBody().connected());
+
+        remove("CP_TEST_10");
+    }
+
+    @Test
+    void rejectsAnUpdateThatRenamesAChargePointOrTargetsAnUnknownOne() {
+        register(new ChargePointRequest("CP_TEST_11", null, null, null, null, null, null, false));
+
+        ResponseEntity<ProblemDetail> renamed = restTemplate.exchange(
+                "/api/charge-points?cpId=CP_TEST_11", HttpMethod.PUT,
+                new HttpEntity<>(new ChargePointRequest("CP_OTHER", null, null, null, null, null, null, null)),
+                ProblemDetail.class);
+        assertEquals(HttpStatus.BAD_REQUEST, renamed.getStatusCode());
+
+        ResponseEntity<ProblemDetail> unknown = restTemplate.exchange(
+                "/api/charge-points?cpId=CP_MISSING", HttpMethod.PUT,
+                new HttpEntity<>(new ChargePointRequest("CP_MISSING", null, null, null, null, null, null, null)),
+                ProblemDetail.class);
+        assertEquals(HttpStatus.NOT_FOUND, unknown.getStatusCode());
+
+        remove("CP_TEST_11");
+    }
+
+    @Test
     void reportsAConflictWhenTheChargePointIsNotConnected() {
         register(new ChargePointRequest("CP_TEST_8", "ws://localhost:9999", null, null, null, null, List.of(1), false));
 

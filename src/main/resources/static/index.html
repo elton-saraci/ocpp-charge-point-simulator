@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <meta name="color-scheme" content="dark"/>
+    <title>Chargomate · Fleet Console</title>
+    <meta name="description" content="Chargomate fleet console — run and drive simulated OCPP 1.6 charge points."/>
+    <link rel="icon" href="favicon.svg"/>
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" href="css/app.css"/>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="topbar">
+    <div class="topbar__inner">
+        <div class="brand">
+            <span class="brand__mark" aria-hidden="true">
+                <svg viewBox="0 0 512 512" focusable="false">
+                    <rect x="0" y="0" width="512" height="512" rx="122.88" fill="#0D1F1A"/>
+                    <path d="M 361.90 167.14 A 138.24 138.24 0 1 0 361.90 344.86" fill="none"
+                          stroke="#5EEAD4" stroke-opacity="0.65" stroke-width="6.66" stroke-linecap="round"/>
+                    <circle cx="361.90" cy="167.14" r="15.36" fill="#5EEAD4"/>
+                    <circle cx="208.72" cy="126.10" r="15.36" fill="#5EEAD4"/>
+                    <circle cx="117.76" cy="256.00" r="25.6" fill="#5EEAD4"/>
+                    <circle cx="208.72" cy="385.90" r="15.36" fill="#5EEAD4"/>
+                    <circle cx="361.90" cy="344.86" r="15.36" fill="#5EEAD4"/>
+                </svg>
+            </span>
+            <span class="brand__text">
+                <span class="brand__title">
+                    <span class="brand__wordmark">chargomate</span>
+                    <span class="brand__badge">console</span>
+                </span>
+                <small>Charge point simulator · OCPP 1.6</small>
+            </span>
+        </div>
+
+        <dl class="metrics" id="metrics" aria-label="Fleet totals">
+            <div class="metric"><dt>Stations</dt><dd data-metric="stations">—</dd></div>
+            <div class="metric"><dt>Online</dt><dd data-metric="online">—</dd></div>
+            <div class="metric"><dt>Charging</dt><dd data-metric="charging">—</dd></div>
+            <div class="metric"><dt>Metered</dt><dd data-metric="energy">—</dd></div>
+        </dl>
+
+        <nav class="tabs" aria-label="Views">
+            <button type="button" class="tab is-active" data-view="fleet" aria-current="page">Fleet</button>
+            <button type="button" class="tab" data-view="station" id="tab-station" disabled>Control</button>
+        </nav>
+    </div>
+</header>
+
+<main id="main">
+    <div class="banner" id="banner" role="alert" hidden>
+        <strong>Simulator unreachable</strong>
+        <span id="banner-detail">Requests to the REST API are failing.</span>
+    </div>
+
+    <!-- ------------------------------------------------------------------ fleet -->
+    <section class="view" id="view-fleet" aria-labelledby="fleet-title">
+        <header class="view__head">
+            <div>
+                <p class="eyebrow">Fleet</p>
+                <h1 id="fleet-title">Charge points</h1>
+                <p class="view__sub" id="fleet-sub">Loading…</p>
+            </div>
+            <div class="view__tools">
+                <label class="field field--inline">
+                    <span class="field__label">Filter</span>
+                    <input id="filter" type="search" placeholder="id or URL" autocomplete="off"/>
+                </label>
+                <button type="button" class="btn btn--primary" data-action="open-create">
+                    <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10"
+                          stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+                    Add charge point
+                </button>
+            </div>
+        </header>
+
+        <div class="grid" id="grid"></div>
+
+        <div class="empty" id="fleet-empty" hidden>
+            <h2 id="empty-title">No charge points yet</h2>
+            <p id="empty-body">Register a charge point to open an OCPP session against your central system.</p>
+            <button type="button" class="btn btn--primary" data-action="open-create">Add charge point</button>
+        </div>
+    </section>
+
+    <!-- ---------------------------------------------------------- control room -->
+    <section class="view" id="view-station" hidden aria-labelledby="station-title">
+        <header class="view__head">
+            <div>
+                <p class="eyebrow">Station control</p>
+                <h1 id="station-title">—</h1>
+                <p class="view__sub" id="station-sub">—</p>
+            </div>
+            <div class="view__tools">
+                <label class="field field--inline">
+                    <span class="field__label">Station</span>
+                    <select id="station-picker"></select>
+                </label>
+                <button type="button" class="btn" id="station-edit">Edit</button>
+                <button type="button" class="btn" id="station-toggle">Connect</button>
+                <button type="button" class="btn btn--danger" id="station-remove">Remove</button>
+            </div>
+        </header>
+
+        <div class="station">
+            <div class="station__main">
+                <section class="panel" aria-labelledby="def-title">
+                    <div class="panel__head">
+                        <h2 class="panel__title" id="def-title">Definition</h2>
+                        <span class="chip mono" id="station-state">—</span>
+                    </div>
+                    <dl class="kv" id="station-kv"></dl>
+                </section>
+
+                <section class="panel" aria-labelledby="connectors-title">
+                    <div class="panel__head">
+                        <h2 class="panel__title" id="connectors-title">Connectors</h2>
+                        <label class="field field--inline field--sm">
+                            <span class="field__label">id tag</span>
+                            <input id="rfid-tag" value="tag1" autocomplete="off" spellcheck="false"/>
+                        </label>
+                    </div>
+                    <div class="connectors" id="connectors"></div>
+                </section>
+            </div>
+
+            <aside class="station__side">
+                <section class="panel panel--fill" aria-labelledby="activity-title">
+                    <div class="panel__head">
+                        <h2 class="panel__title" id="activity-title">Activity</h2>
+                        <button type="button" class="btn btn--ghost btn--sm" id="clear-log">Clear</button>
+                    </div>
+                    <ol class="log" id="log"></ol>
+                </section>
+            </aside>
+        </div>
+    </section>
+</main>
+
+<footer class="footer">
+    <div class="footer__inner">
+        <div class="footer__brand">
+            <svg viewBox="0 0 512 512" aria-hidden="true" focusable="false">
+                <rect x="0" y="0" width="512" height="512" rx="122.88" fill="#0D1F1A"/>
+                <path d="M 361.90 167.14 A 138.24 138.24 0 1 0 361.90 344.86" fill="none"
+                      stroke="#5EEAD4" stroke-opacity="0.65" stroke-width="6.66" stroke-linecap="round"/>
+                <circle cx="361.90" cy="167.14" r="15.36" fill="#5EEAD4"/>
+                <circle cx="208.72" cy="126.10" r="15.36" fill="#5EEAD4"/>
+                <circle cx="117.76" cy="256.00" r="25.6" fill="#5EEAD4"/>
+                <circle cx="208.72" cy="385.90" r="15.36" fill="#5EEAD4"/>
+                <circle cx="361.90" cy="344.86" r="15.36" fill="#5EEAD4"/>
+            </svg>
+            <div>
+                <strong>Chargomate</strong> Fleet Console
+                <span class="footer__tagline"> · EV charging operations, made agentic</span>
+            </div>
+        </div>
+        <div class="footer__credit">
+            <span>Built by Elton Saraci · <a href="mailto:elton@chargomate.com">elton@chargomate.com</a></span>
+            <span>
+                <a href="https://chargomate.com" target="_blank" rel="noopener noreferrer">chargomate.com</a>
+                · © <span data-year></span> Chargomate. All rights reserved.
+            </span>
+        </div>
+    </div>
+</footer>
+
+<!-- ------------------------------------------------------------------- dialog -->
+<dialog class="dialog" id="station-dialog" aria-labelledby="dialog-title">
+    <form id="station-form" novalidate>
+        <header class="dialog__head">
+            <h2 id="dialog-title">Add charge point</h2>
+            <button type="button" class="btn btn--ghost btn--icon" id="form-close" aria-label="Close">
+                <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8"
+                      stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            </button>
+        </header>
+
+        <div class="dialog__body">
+            <div class="form-grid">
+                <label class="field field--wide">
+                    <span class="field__label">Charge point id</span>
+                    <input name="chargePointId" required autocomplete="off" spellcheck="false" placeholder="CP_SIM_001"/>
+                    <small class="field__hint">Used as the identity and appended to the central system URL.</small>
+                </label>
+
+                <label class="field field--wide">
+                    <span class="field__label">Central system URL</span>
+                    <input name="centralSystemUrl" autocomplete="off" spellcheck="false" placeholder="ws://localhost:8080"/>
+                    <small class="field__hint">ws:// or wss:// — leave empty to use the configured default.</small>
+                </label>
+
+                <label class="field">
+                    <span class="field__label">Charging power (W)</span>
+                    <input name="chargingPower" type="number" min="1" step="100" placeholder="5000"/>
+                </label>
+
+                <label class="field">
+                    <span class="field__label">Meter interval (s)</span>
+                    <input name="meterValuesFrequency" type="number" min="1" step="1" placeholder="60"/>
+                </label>
+
+                <label class="field field--wide">
+                    <span class="field__label">Connector ids</span>
+                    <input name="connectorIds" autocomplete="off" spellcheck="false" placeholder="1"/>
+                    <small class="field__hint" id="connector-hint">Comma separated, greater than zero and unique.</small>
+                </label>
+
+                <label class="field">
+                    <span class="field__label">Basic auth user</span>
+                    <input name="username" autocomplete="off" spellcheck="false" placeholder="optional"/>
+                </label>
+
+                <label class="field">
+                    <span class="field__label">Basic auth password</span>
+                    <input name="password" type="password" autocomplete="new-password" placeholder="optional"/>
+                </label>
+
+                <label class="field field--wide checkbox">
+                    <input name="connect" type="checkbox" checked/>
+                    <span>Connect to the central system after saving</span>
+                </label>
+            </div>
+
+            <div class="preview" id="form-preview" aria-live="polite"></div>
+        </div>
+
+        <footer class="dialog__foot">
+            <p class="dialog__error" id="form-error" hidden></p>
+            <button type="button" class="btn" id="form-cancel">Cancel</button>
+            <button type="submit" class="btn btn--primary" id="form-submit">Create</button>
+        </footer>
+    </form>
+</dialog>
+
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+
+<script src="js/app.js" defer></script>
+</body>
+</html>

@@ -6,6 +6,28 @@ One instance runs **any number of charge points**. Each has its own WebSocket co
 connectors and, optionally, its own HTTP Basic credentials. Charge points are created, inspected and driven over the
 REST API while the application runs, so you no longer need a container per charge point.
 
+A small web console is bundled with the simulator and served from the same port, so the whole thing is one process and
+one image.
+
+## Web console
+
+Open `http://localhost:8080/` after starting the simulator.
+
+- **Fleet** — every charge point as a card: connection state, power, metering interval, per-connector status, last
+  error, and one-click connect/disconnect/remove. Adding or editing a charge point opens a dialog with validation and a
+  live preview of the resulting session URL and the meter value step.
+- **Control** — one station in detail: its definition, a connector panel per connector with a power gauge, energy
+  register, live session timer and an energy trend, buttons to plug in, tap a card and plug out, plus an activity feed
+  that turns the polled state into a readable story (status transitions, transaction start/stop, errors).
+
+It is hand-written HTML/CSS/JavaScript served from `src/main/resources/static`, so there is no Node build step and no
+second container. It refreshes from the REST API every two seconds, and editing a station rebuilds it in place: running
+transactions are closed properly, energy registers of connectors that still exist are kept, and the connection state is
+preserved.
+
+The console carries the Chargomate identity — ink and emerald palette, Space Grotesk over Inter, the Chargomate mark —
+and credits the author in its footer.
+
 ## How to run it locally
 
 Project specs: Java 25, Spring Boot 3.5.16.
@@ -32,9 +54,9 @@ curl -X POST localhost:8080/api/charge-points -H 'Content-Type: application/json
 }'
 ```
 
-The API covers the whole lifecycle (register, list, connect, disconnect, remove) and the connector operations
-(plug-in, plug-out, RFID authorization). Every endpoint, its parameters and the available body fields are documented in
-the Swagger UI at `http://localhost:8080/swagger-ui/index.html`.
+The API covers the whole lifecycle (register, list, inspect, update, connect, disconnect, remove) and the connector
+operations (plug-in, plug-out, RFID authorization). Every endpoint, its parameters and the available body fields are
+documented in the Swagger UI at `http://localhost:8080/swagger-ui/index.html`.
 
 ### Defaults
 
@@ -86,8 +108,9 @@ The connection to the central system is outbound, so no inbound firewall rules a
 ./mvnw test
 ```
 
-Covers the metering formula, charge point validation, the registry, the REST API including its status mapping, and real
-WebSocket connections (several charge points in parallel, the `ocpp1.6` subprotocol, BootNotification and Basic auth).
+Covers the metering formula, charge point validation, the registry, the station update path, the REST API including its
+status mapping, and real WebSocket connections (several charge points in parallel, the `ocpp1.6` subprotocol,
+BootNotification and Basic auth).
 
 ## Next steps
 - Add the logic for SUSPENDED connector status
@@ -100,3 +123,12 @@ WebSocket connections (several charge points in parallel, the `ocpp1.6` subproto
 ## References
 - [OCPP OFFICIAL DOCUMENTATION](https://www.oasis-open.org/committees/download.php/58944/ocpp-1.6.pdf)
 - [OCPP client-server library](https://github.com/ChargeTimeEU/Java-OCA-OCPP)
+
+## License
+
+[MIT](LICENSE) — do whatever you want with it: use it, change it, ship it, sell it, just keep the copyright notice and
+don't hold the author liable.
+
+The OCPP library it builds on ([Java-OCA-OCPP](https://github.com/ChargeTimeEU/Java-OCA-OCPP)) is MIT as well, while
+Spring Boot, springdoc and Gson are Apache-2.0 and Lombok and Java-WebSocket are MIT, so nothing in the dependency tree
+conflicts with it.

@@ -2,6 +2,8 @@ package com.ocpp.chargepointsimulator.domain;
 
 import eu.chargetime.ocpp.model.core.ChargePointStatus;
 
+import java.time.Instant;
+
 /**
  * Mutable runtime state of a single connector.
  *
@@ -15,6 +17,7 @@ public class ConnectorState {
     private int currentMeterValueWh = 0;
     private String idTag;
     private Integer transactionId;
+    private Instant transactionStartedAt;
     private long lastMeterValuesEpochMillis;
 
     public ConnectorState(int connectorId) {
@@ -58,11 +61,18 @@ public class ConnectorState {
         this.transactionId = transactionId;
         this.idTag = idTag;
         this.status = status;
+        this.transactionStartedAt = Instant.now();
+    }
+
+    /** @return when the running transaction started, {@code null} when there is none. */
+    public synchronized Instant getTransactionStartedAt() {
+        return transactionStartedAt;
     }
 
     public synchronized void clearTransaction() {
         this.transactionId = null;
         this.idTag = null;
+        this.transactionStartedAt = null;
     }
 
     public synchronized int getCurrentMeterValueWh() {
@@ -73,6 +83,14 @@ public class ConnectorState {
     public synchronized int advanceMeterValueWh(int stepWh) {
         currentMeterValueWh += stepWh;
         return currentMeterValueWh;
+    }
+
+    /**
+     * Restores the energy register, used when a charge point is redefined and the physical meter of a
+     * connector keeps counting across the change.
+     */
+    public synchronized void restoreMeterValueWh(int meterValueWh) {
+        this.currentMeterValueWh = meterValueWh;
     }
 
     public synchronized void markMeterValuesSent(long epochMillis) {

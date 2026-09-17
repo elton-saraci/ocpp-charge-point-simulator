@@ -13,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -48,6 +49,21 @@ public class ChargePointController {
     @GetMapping
     public List<ChargePointResponse> list() {
         return ChargePointResponse.from(chargePointService.list());
+    }
+
+    /**
+     * Rebuilds an existing charge point with the definition from the body. The body is a complete
+     * definition, exactly like {@code POST}: fields that are left out fall back to the configured
+     * defaults. The id cannot be changed. When {@code connect} is omitted the current connection state
+     * is kept.
+     */
+    @PutMapping
+    public ChargePointResponse update(@RequestParam String cpId, @RequestBody ChargePointRequest request) {
+        log.info("Incoming request to update charge point '{}'.", cpId);
+        boolean connect = request.connect() != null
+                ? request.connect()
+                : chargePointService.get(cpId).isConnected();
+        return ChargePointResponse.from(chargePointService.update(cpId, request.toConfig(defaults), connect));
     }
 
     @GetMapping("/detail")

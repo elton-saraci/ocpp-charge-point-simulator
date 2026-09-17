@@ -191,8 +191,16 @@ public class TransactionService {
         }
     }
 
-    private ConnectorState stopTransaction(ChargePointSession session, ConnectorState connector,
-                                          ChargePointStatus targetStatus, Reason reason) {
+    /**
+     * Stops a running transaction synchronously and tells the central system about it. Used by the
+     * HTTP operations and when a charge point is redefined, so the central system never keeps a
+     * dangling transaction.
+     *
+     * @throws com.ocpp.chargepointsimulator.exceptions.OcppRequestException when the central system
+     *         cannot be reached or refuses the message
+     */
+    public ConnectorState stopTransaction(ChargePointSession session, ConnectorState connector,
+                                         ChargePointStatus targetStatus, Reason reason) {
         if (!connector.hasTransaction()) {
             log.warn("[{}] Connector {} has no active transaction, skipping StopTransaction.",
                     session.getChargePointId(), connector.getConnectorId());

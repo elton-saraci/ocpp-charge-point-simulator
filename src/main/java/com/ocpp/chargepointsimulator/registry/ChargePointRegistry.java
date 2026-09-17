@@ -52,6 +52,21 @@ public class ChargePointRegistry {
         return session;
     }
 
+    /**
+     * Swaps a registered charge point for a new session with the same id.
+     *
+     * @return the session that was replaced
+     * @throws ChargePointNotFoundException when there is nothing to replace
+     */
+    public ChargePointSession replace(ChargePointSession session) {
+        ChargePointSession previous = sessions.replace(session.getChargePointId(), session);
+        if (previous == null) {
+            throw new ChargePointNotFoundException("No charge point registered with id '" + session.getChargePointId()
+                    + "'. Registered charge points: " + registeredIds() + ".");
+        }
+        return previous;
+    }
+
     public Collection<ChargePointSession> all() {
         return List.copyOf(sessions.values());
     }
