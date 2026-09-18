@@ -14,6 +14,9 @@ import java.time.Instant;
  * @param transactionId       id of the running transaction, {@code null} when there is none
  * @param transactionStartedAt when the running transaction started, {@code null} when there is none
  * @param meterValueWh        current value of the simulated energy register in Wh
+ * @param chargingLimitW      power the stored charging profiles allow right now, {@code null} when
+ *                            no profile applies and the connector uses the nominal power
+ * @param suspended           whether a charging profile holds the connector at zero power
  */
 public record ConnectorResponse(
         int connectorId,
@@ -21,7 +24,9 @@ public record ConnectorResponse(
         String idTag,
         Integer transactionId,
         Instant transactionStartedAt,
-        int meterValueWh) {
+        int meterValueWh,
+        Integer chargingLimitW,
+        boolean suspended) {
 
     public static ConnectorResponse from(ConnectorState connector) {
         return new ConnectorResponse(
@@ -30,6 +35,8 @@ public record ConnectorResponse(
                 connector.getIdTag(),
                 connector.getTransactionId(),
                 connector.getTransactionStartedAt(),
-                connector.getCurrentMeterValueWh());
+                connector.getCurrentMeterValueWh(),
+                connector.getChargingLimitW(),
+                connector.isSuspended());
     }
 }

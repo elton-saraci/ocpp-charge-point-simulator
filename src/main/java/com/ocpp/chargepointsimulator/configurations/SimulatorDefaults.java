@@ -20,6 +20,8 @@ public record SimulatorDefaults(
         String username,
         String password,
         int chargingPower,
+        Integer phaseVoltage,
+        Integer numberPhases,
         int meterValuesFrequency,
         List<Integer> connectorIds) {
 
@@ -31,6 +33,9 @@ public record SimulatorDefaults(
     /** @throws com.ocpp.chargepointsimulator.exceptions.InvalidChargePointConfigException when the values are invalid. */
     public ChargePointConfig toChargePointConfig() {
         return new ChargePointConfig(chargePointId, centralSystemUrl, username, password,
-                chargingPower, meterValuesFrequency, connectorIds);
+                chargingPower,
+                phaseVoltage == null ? ChargePointConfig.DEFAULT_PHASE_VOLTAGE : phaseVoltage,
+                numberPhases == null ? ChargePointConfig.DEFAULT_PHASES : numberPhases,
+                meterValuesFrequency, connectorIds);
     }
 }

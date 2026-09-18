@@ -20,14 +20,15 @@ public final class EnergyMeterCalculator {
     }
 
     /**
-     * @param chargingPowerW   constant charging power in Watt, must be positive
+     * @param chargingPowerW   constant charging power in Watt, must not be negative; {@code 0} is a
+     *     connector that a charging profile suspended, and adds no energy
      * @param intervalSeconds  metering interval in seconds, must be positive
      * @return energy in Wh to add to the meter register for one metering interval, rounded to the
      *     nearest Wh
      */
     public static int energyStepWh(int chargingPowerW, int intervalSeconds) {
-        if (chargingPowerW <= 0) {
-            throw new IllegalArgumentException("chargingPowerW must be greater than 0, but was " + chargingPowerW + ".");
+        if (chargingPowerW < 0) {
+            throw new IllegalArgumentException("chargingPowerW must not be negative, but was " + chargingPowerW + ".");
         }
         if (intervalSeconds <= 0) {
             throw new IllegalArgumentException("intervalSeconds must be greater than 0, but was " + intervalSeconds + ".");

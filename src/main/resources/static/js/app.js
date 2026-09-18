@@ -400,7 +400,22 @@
             <span class="chip" data-status="${escapeHtml(connector.status)}">
                 #${connector.connectorId} ${escapeHtml(connector.status)}
                 ${connector.meterValueWh > 0 ? `· ${formatKwh(connector.meterValueWh)}` : ''}
+                ${limitNote(connector)}
             </span>`).join('');
+    }
+
+    /**
+     * The power a charging profile allows, shown as a suffix on the connector chip. Central systems
+     * that use smart charging look for this, and a suspended connector is worth calling out.
+     */
+    function limitNote(connector) {
+        if (connector.suspended) {
+            return '· suspended by profile';
+        }
+        if (connector.chargingLimitW === null || connector.chargingLimitW === undefined) {
+            return '';
+        }
+        return `· ${formatPower(connector.chargingLimitW)} limit`;
     }
 
     function stationCard(station) {

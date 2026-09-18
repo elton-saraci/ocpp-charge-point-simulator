@@ -8,6 +8,7 @@ import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
@@ -36,12 +37,20 @@ public class ChargePointConnectionManager {
     private final OcppMessageFactory messageFactory;
 
     /**
-     * Own pool for the delayed BootNotification. It does not use the application task scheduler,
-     * because sending blocks until the central system confirms and that must never delay the
-     * scheduled metering of other charge points.
+     * Schedules the delayed BootNotification and the connect check. Scheduling never blocks, so a small
+     * pool is enough for every charge point of this instance. It does not use the application task
+     * scheduler, because that one also drives the scheduled metering.
      */
-    private final ScheduledExecutorService bootNotificationExecutor =
+    private final ScheduledExecutorService bootNotificationScheduler =
             Executors.newScheduledThreadPool(2, namedThreadFactory());
+
+    /**
+     * Runs the work that blocks until the central system answers. Sending a BootNotification waits for
+     * the confirmation, and the OCPP library blocks the calling thread while it does. A cached pool
+     * gives every booting charge point its own thread, so a central system that never confirms cannot
+     * delay the boot notification of all the other charge points.
+     */
+    private final ExecutorService bootNotificationExecutor = Executors.newCachedThreadPool(namedThreadFactory());
 
     public ChargePointConnectionManager(OcppRequestSender requestSender, OcppMessageFactory messageFactory) {
         this.requestSender = requestSender;
@@ -50,6 +59,7 @@ public class ChargePointConnectionManager {
 
     @PreDestroy
     void shutdown() {
+        bootNotificationScheduler.shutdownNow();
         bootNotificationExecutor.shutdownNow();
     }
 
@@ -84,7 +94,7 @@ public class ChargePointConnectionManager {
      * library, so the session would silently stay disconnected. This check makes that state visible.
      */
     private void scheduleConnectCheck(ChargePointSession session, String webSocketUrl) {
-        bootNotificationExecutor.schedule(() -> {
+        bootNotificationScheduler.schedule(() -> {
             if (!session.isConnected()) {
                 session.recordError("No WebSocket connection to " + webSocketUrl + ".");
                 log.warn("[{}] Still not connected to {} {}s after the connect request, "
@@ -118,23 +128,27 @@ public class ChargePointConnectionManager {
     }
 
     private void scheduleBootNotification(ChargePointSession session) {
-        bootNotificationExecutor.schedule(() -> {
-            try {
-                BootNotificationConfirmation confirmation = requestSender.sendAndExpect(session,
-                        messageFactory.bootNotification(session.getConfig()), BootNotificationConfirmation.class);
-                if (RegistrationStatus.Accepted == confirmation.getStatus()) {
-                    log.info("[{}] BootNotification accepted (heartbeat interval {}s).",
-                            session.getChargePointId(), confirmation.getInterval());
-                } else {
-                    session.recordError("BootNotification was not accepted: " + confirmation.getStatus());
-                    log.warn("[{}] BootNotification was not accepted: {}",
-                            session.getChargePointId(), confirmation.getStatus());
-                }
-            } catch (RuntimeException e) {
-                session.recordError("BootNotification failed: " + e.getMessage());
-                log.error("[{}] BootNotification failed.", session.getChargePointId(), e);
+        bootNotificationScheduler.schedule(
+                () -> bootNotificationExecutor.execute(() -> sendBootNotification(session)),
+                BOOT_NOTIFICATION_DELAY_SECONDS, TimeUnit.SECONDS);
+    }
+
+    private void sendBootNotification(ChargePointSession session) {
+        try {
+            BootNotificationConfirmation confirmation = requestSender.sendAndExpect(session,
+                    messageFactory.bootNotification(session.getConfig()), BootNotificationConfirmation.class);
+            if (RegistrationStatus.Accepted == confirmation.getStatus()) {
+                log.info("[{}] BootNotification accepted (heartbeat interval {}s).",
+                        session.getChargePointId(), confirmation.getInterval());
+            } else {
+                session.recordError("BootNotification was not accepted: " + confirmation.getStatus());
+                log.warn("[{}] BootNotification was not accepted: {}",
+                        session.getChargePointId(), confirmation.getStatus());
             }
-        }, BOOT_NOTIFICATION_DELAY_SECONDS, TimeUnit.SECONDS);
+        } catch (RuntimeException e) {
+            session.recordError("BootNotification failed: " + e.getMessage());
+            log.error("[{}] BootNotification failed.", session.getChargePointId(), e);
+        }
     }
 
     private ThreadFactory namedThreadFactory() {

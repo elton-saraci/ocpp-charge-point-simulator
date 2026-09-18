@@ -69,7 +69,7 @@ public class OcppMessageFactory {
         return request;
     }
 
-    public StopTransactionRequest stopTransaction(ChargePointConfig config, ConnectorState connector, Reason reason) {
+    public StopTransactionRequest stopTransaction(ConnectorState connector, int powerW, Reason reason) {
         StopTransactionRequest request = new StopTransactionRequest();
         request.setTransactionId(connector.getTransactionId());
         request.setIdTag(connector.getIdTag());
@@ -77,21 +77,23 @@ public class OcppMessageFactory {
         request.setTimestamp(ZonedDateTime.now());
         request.setReason(reason);
         request.setTransactionData(new MeterValue[] {
-                meterValue(connector.getCurrentMeterValueWh(), config.chargingPower()) });
+                meterValue(connector.getCurrentMeterValueWh(), powerW) });
         return request;
     }
 
     /**
      * Builds a MeterValues request and advances the connector's energy register by the energy that
      * was charged during one metering interval, see {@link EnergyMeterCalculator}.
+     *
+     * @param powerW the power the charging profiles allow right now, {@code 0} while suspended
      */
-    public MeterValuesRequest meterValues(ChargePointConfig config, ConnectorState connector) {
-        int energyStepWh = EnergyMeterCalculator.energyStepWh(config.chargingPower(), config.meterValuesFrequency());
+    public MeterValuesRequest meterValues(ChargePointConfig config, ConnectorState connector, int powerW) {
+        int energyStepWh = EnergyMeterCalculator.energyStepWh(powerW, config.meterValuesFrequency());
         int meterValueWh = connector.advanceMeterValueWh(energyStepWh);
         MeterValuesRequest request = new MeterValuesRequest();
         request.setConnectorId(connector.getConnectorId());
         request.setTransactionId(connector.getTransactionId());
-        request.setMeterValue(new MeterValue[] { meterValue(meterValueWh, config.chargingPower()) });
+        request.setMeterValue(new MeterValue[] { meterValue(meterValueWh, powerW) });
         return request;
     }
 

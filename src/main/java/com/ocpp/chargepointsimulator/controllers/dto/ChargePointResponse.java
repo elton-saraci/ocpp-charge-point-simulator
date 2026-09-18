@@ -29,6 +29,8 @@ public record ChargePointResponse(
         boolean connected,
         boolean authenticated,
         int chargingPower,
+        int phaseVoltage,
+        int numberPhases,
         int meterValuesFrequency,
         List<ConnectorResponse> connectors,
         String lastError,
@@ -43,6 +45,8 @@ public record ChargePointResponse(
                 .connected(session.isConnected())
                 .authenticated(config.hasCredentials())
                 .chargingPower(config.chargingPower())
+                .phaseVoltage(config.phaseVoltage())
+                .numberPhases(config.numberPhases())
                 .meterValuesFrequency(config.meterValuesFrequency())
                 .connectors(session.getConnectors().stream().map(ConnectorResponse::from).toList())
                 .lastError(session.getLastError().orElse(null))

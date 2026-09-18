@@ -8,6 +8,7 @@ import eu.chargetime.ocpp.JSONClient;
 import eu.chargetime.ocpp.JSONConfiguration;
 import eu.chargetime.ocpp.feature.profile.ClientCoreProfile;
 import eu.chargetime.ocpp.feature.profile.ClientRemoteTriggerProfile;
+import eu.chargetime.ocpp.feature.profile.ClientSmartChargingProfile;
 import eu.chargetime.ocpp.wss.BaseWssSocketBuilder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,9 +42,12 @@ public class ChargePointSessionFactory {
                 new ClientCoreProfile(new ChargePointCoreEventHandler(session, transactionService));
         ClientRemoteTriggerProfile remoteTriggerProfile = new ClientRemoteTriggerProfile(
                 new ChargePointRemoteTriggerHandler(session, messageFactory, requestSender));
+        ClientSmartChargingProfile smartChargingProfile =
+                new ClientSmartChargingProfile(new ChargePointSmartChargingHandler(session));
 
         JSONClient jsonClient = new JSONClient(coreProfile, null, jsonConfiguration(config));
         jsonClient.addFeatureProfile(remoteTriggerProfile);
+        jsonClient.addFeatureProfile(smartChargingProfile);
         // wss:// needs a socket builder, the library refuses the scheme otherwise.
         if (config.usesSecureWebSocket()) {
             enableSecureWebSocket(jsonClient);

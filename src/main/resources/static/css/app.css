@@ -466,6 +466,9 @@ main {
     background: color-mix(in srgb, var(--live) 10%, var(--surface-2));
 }
 .chip[data-status="Finishing"] { color: var(--settle); border-color: color-mix(in srgb, var(--settle) 30%, var(--line)); }
+/* a charging profile holds the connector at zero power: the session is alive, the car is not charging */
+.chip[data-status="SuspendedEVSE"],
+.chip[data-status="SuspendedEV"] { color: var(--busy); border-color: color-mix(in srgb, var(--busy) 32%, var(--line)); }
 .chip[data-tone="ok"] { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 32%, var(--line)); }
 .chip[data-tone="off"] { color: var(--text-faint); }
 .chip[data-tone="accent"] { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 32%, var(--line)); }

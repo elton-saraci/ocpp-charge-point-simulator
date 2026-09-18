@@ -19,6 +19,8 @@ import java.util.Set;
  * @param username             HTTP Basic username used for the OCPP handshake, {@code null} to disable auth
  * @param password             HTTP Basic password used for the OCPP handshake, {@code null} to disable auth
  * @param chargingPower        charging power in Watt, used to derive the meter value step
+ * @param phaseVoltage         nominal voltage of one phase in Volt, converts Ampere limits to Watt
+ * @param numberPhases         phases a connector of this charge point can use, 1 to 3
  * @param meterValuesFrequency seconds between two MeterValues messages
  * @param connectorIds         connector ids exposed by this charge point, all greater than zero
  */
@@ -28,11 +30,35 @@ public record ChargePointConfig(
         String username,
         String password,
         int chargingPower,
+        int phaseVoltage,
+        int numberPhases,
         int meterValuesFrequency,
         List<Integer> connectorIds) {
 
+    /** Default phase voltage in Volt, the European low voltage grid. */
+    public static final int DEFAULT_PHASE_VOLTAGE = 230;
+    /** Default number of phases, which is also the OCPP default of a charging schedule period. */
+    public static final int DEFAULT_PHASES = 3;
+    private static final int MIN_PHASE_VOLTAGE = 100;
+    private static final int MAX_PHASE_VOLTAGE = 1_000;
+
     private static final String WEB_SOCKET_SCHEME = "ws://";
     private static final String SECURE_WEB_SOCKET_SCHEME = "wss://";
+
+    /**
+     * Builds a configuration with the default electrical properties, {@value #DEFAULT_PHASE_VOLTAGE} V
+     * per phase and {@value #DEFAULT_PHASES} phases.
+     */
+    public ChargePointConfig(String chargePointId,
+                            String centralSystemUrl,
+                            String username,
+                            String password,
+                            int chargingPower,
+                            int meterValuesFrequency,
+                            List<Integer> connectorIds) {
+        this(chargePointId, centralSystemUrl, username, password, chargingPower,
+                DEFAULT_PHASE_VOLTAGE, DEFAULT_PHASES, meterValuesFrequency, connectorIds);
+    }
 
     public ChargePointConfig {
         chargePointId = trimToNull(chargePointId);
@@ -61,6 +87,15 @@ public record ChargePointConfig(
         if (chargingPower <= 0) {
             throw new InvalidChargePointConfigException(
                     "chargingPower must be greater than 0 Watt, but was " + chargingPower + ".");
+        }
+        if (phaseVoltage < MIN_PHASE_VOLTAGE || phaseVoltage > MAX_PHASE_VOLTAGE) {
+            throw new InvalidChargePointConfigException(
+                    "phaseVoltage must be between " + MIN_PHASE_VOLTAGE + " and " + MAX_PHASE_VOLTAGE
+                            + " Volt, but was " + phaseVoltage + ".");
+        }
+        if (numberPhases < 1 || numberPhases > DEFAULT_PHASES) {
+            throw new InvalidChargePointConfigException(
+                    "numberPhases must be between 1 and " + DEFAULT_PHASES + ", but was " + numberPhases + ".");
         }
         if (meterValuesFrequency <= 0) {
             throw new InvalidChargePointConfigException(

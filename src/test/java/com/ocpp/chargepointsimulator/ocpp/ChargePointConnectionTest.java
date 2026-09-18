@@ -120,6 +120,41 @@ class ChargePointConnectionTest {
         assertFalse(session.isConnected());
     }
 
+    @Test
+    void acceptsAChargingProfilePushedOverTheWire() {
+        ChargePointSession session = chargePointService.register(config("CP_SMART_OK", null, null, List.of(1)), true);
+        await(session::isConnected);
+        await(() -> !centralSystem.messages.isEmpty());
+
+        centralSystem.push(setChargingProfile("profile-1", 1));
+
+        await(() -> centralSystem.messages.stream().anyMatch(message -> message.contains("\"status\":\"Accepted\"")));
+        assertEquals(1, session.getChargingProfiles().size());
+    }
+
+    @Test
+    void rejectsAChargingProfileForAConnectorItDoesNotHave() {
+        ChargePointSession session = chargePointService.register(config("CP_SMART_BAD", null, null, List.of(1)), true);
+        await(session::isConnected);
+        await(() -> !centralSystem.messages.isEmpty());
+
+        centralSystem.push(setChargingProfile("profile-2", 9));
+
+        await(() -> centralSystem.messages.stream().anyMatch(message -> message.contains("\"status\":\"Rejected\"")));
+        assertEquals(0, session.getChargingProfiles().size());
+    }
+
+    /** An OCPP-J {@code SetChargingProfile} call with a 6 A default profile. */
+    private static String setChargingProfile(String uniqueId, int connectorId) {
+        return """
+                [2,"%s","SetChargingProfile",{"connectorId":%d,"csChargingProfiles":{
+                  "chargingProfileId":1,"stackLevel":0,
+                  "chargingProfilePurpose":"TxDefaultProfile","chargingProfileKind":"Absolute",
+                  "chargingSchedule":{"chargingRateUnit":"A",
+                    "chargingSchedulePeriod":[{"startPeriod":0,"limit":%s}]}}}]
+                """.formatted(uniqueId, connectorId, (double) 6);
+    }
+
     private ChargePointConfig config(String chargePointId, String username, String password, List<Integer> connectorIds) {
         return new ChargePointConfig(chargePointId, "ws://localhost:" + centralSystemPort,
                 username, password, 5000, 60, connectorIds);
@@ -184,6 +219,11 @@ class ChargePointConnectionTest {
             // HandshakeImpl1Server returns an empty string for headers that were not sent.
             String authorization = handshake.getFieldValue("Authorization");
             authorizationHeaders.add(authorization == null || authorization.isEmpty() ? null : authorization);
+        }
+
+        /** Sends a raw OCPP-J frame to every connected charge point, the way a central system does. */
+        private void push(String frame) {
+            getConnections().forEach(connection -> connection.send(frame));
         }
 
         @Override

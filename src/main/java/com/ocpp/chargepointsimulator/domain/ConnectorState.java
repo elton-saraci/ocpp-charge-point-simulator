@@ -19,6 +19,10 @@ public class ConnectorState {
     private Integer transactionId;
     private Instant transactionStartedAt;
     private long lastMeterValuesEpochMillis;
+    /** Limit imposed by the stored charging profiles, {@code null} when none applies. */
+    private Integer chargingLimitW;
+    /** Set while a charging profile holds this connector at zero power. */
+    private boolean suspended;
 
     public ConnectorState(int connectorId) {
         this.connectorId = connectorId;
@@ -38,6 +42,24 @@ public class ConnectorState {
 
     public synchronized boolean isCharging() {
         return ChargePointStatus.Charging == status;
+    }
+
+    /** @return the power limit the charging profiles impose, {@code null} when no profile applies. */
+    public synchronized Integer getChargingLimitW() {
+        return chargingLimitW;
+    }
+
+    public synchronized void setChargingLimitW(Integer chargingLimitW) {
+        this.chargingLimitW = chargingLimitW;
+    }
+
+    /** @return whether a charging profile holds this connector at zero power right now. */
+    public synchronized boolean isSuspended() {
+        return suspended;
+    }
+
+    public synchronized void setSuspended(boolean suspended) {
+        this.suspended = suspended;
     }
 
     public synchronized boolean hasTransaction() {
@@ -73,6 +95,7 @@ public class ConnectorState {
         this.transactionId = null;
         this.idTag = null;
         this.transactionStartedAt = null;
+        this.suspended = false;
     }
 
     public synchronized int getCurrentMeterValueWh() {

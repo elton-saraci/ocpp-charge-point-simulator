@@ -74,12 +74,11 @@ public class TransactionService {
         log.info("[{}] Plug-in on connector {} (status {}, idTag {})",
                 session.getChargePointId(), connector.getConnectorId(), status, connector.getIdTag());
 
-        if (ChargePointStatus.Charging == status) {
-            log.warn("[{}] Connector {} is already charging, plug-in ignored.",
-                    session.getChargePointId(), connector.getConnectorId());
+        if (connector.hasTransaction()) {
+            log.warn("[{}] Connector {} already runs transaction {}, plug-in ignored.",
+                    session.getChargePointId(), connector.getConnectorId(), connector.getTransactionId());
             return connector;
-        }
-        if (ChargePointStatus.Available == status && connector.getIdTag() != null) {
+        }        if (ChargePointStatus.Available == status && connector.getIdTag() != null) {
             startTransaction(session, connector, connector.getIdTag());
             return connector;
         }
@@ -92,7 +91,7 @@ public class TransactionService {
         log.info("[{}] Plug-out on connector {} (status {})",
                 session.getChargePointId(), connector.getConnectorId(), status);
 
-        if (ChargePointStatus.Charging == status) {
+        if (ChargePointStatus.Charging == status || ChargePointStatus.SuspendedEVSE == status) {
             return stopTransaction(session, connector, ChargePointStatus.Available, Reason.EVDisconnected);
         }
         if (ChargePointStatus.Preparing == status || ChargePointStatus.Finishing == status) {
@@ -207,12 +206,22 @@ public class TransactionService {
             return connector;
         }
         Integer transactionId = connector.getTransactionId();
-        requestSender.send(session, messageFactory.stopTransaction(session.getConfig(), connector, reason));
+        requestSender.send(session, messageFactory.stopTransaction(connector,
+                currentPowerW(session, connector), reason));
         connector.clearTransaction();
         notifyStatus(session, connector, targetStatus);
         log.info("[{}] Connector {} stopped transaction {} ({}) and is now {}.",
                 session.getChargePointId(), connector.getConnectorId(), transactionId, reason, targetStatus);
         return connector;
+    }
+
+    /**
+     * The power to report in the transaction data: the limit the charging profiles impose, or the
+     * nominal power of the charge point when no profile applies.
+     */
+    private int currentPowerW(ChargePointSession session, ConnectorState connector) {
+        Integer limit = connector.getChargingLimitW();
+        return limit == null ? session.getConfig().chargingPower() : limit;
     }
 
     /**

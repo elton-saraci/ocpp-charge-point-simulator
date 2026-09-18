@@ -4,6 +4,7 @@ import com.ocpp.chargepointsimulator.domain.AuthorizationOutcome;
 import com.ocpp.chargepointsimulator.domain.ChargePointConfig;
 import com.ocpp.chargepointsimulator.domain.ChargePointSession;
 import com.ocpp.chargepointsimulator.domain.ConnectorState;
+import com.ocpp.chargepointsimulator.domain.StoredChargingProfile;
 import com.ocpp.chargepointsimulator.exceptions.InvalidChargePointConfigException;
 import com.ocpp.chargepointsimulator.ocpp.ChargePointConnectionManager;
 import com.ocpp.chargepointsimulator.ocpp.ChargePointSessionFactory;
@@ -69,6 +70,7 @@ public class ChargePointService {
         ChargePointSession replacement = sessionFactory.create(config);
         endRunningTransactions(existing);
         carryOverMeterValues(existing, replacement);
+        carryOverChargingProfiles(existing, replacement);
         registry.replace(replacement);
         connectionManager.disconnectQuietly(existing);
         if (connect) {
@@ -103,6 +105,23 @@ public class ChargePointService {
         for (ConnectorState connector : existing.getConnectors()) {
             replacement.findConnector(connector.getConnectorId())
                     .ifPresent(newConnector -> newConnector.restoreMeterValueWh(connector.getCurrentMeterValueWh()));
+        }
+    }
+
+    /**
+     * Charging profiles live in the memory of the charge point, a central system does not resend them
+     * after a redefinition, so they are moved to the new session instead of being lost. Profiles for
+     * connectors that no longer exist are dropped.
+     */
+    private void carryOverChargingProfiles(ChargePointSession existing, ChargePointSession replacement) {
+        List<StoredChargingProfile> keeping = existing.getChargingProfiles().all().stream()
+                .filter(profile -> profile.connectorId() == 0
+                        || replacement.findConnector(profile.connectorId()).isPresent())
+                .toList();
+        if (!keeping.isEmpty()) {
+            replacement.getChargingProfiles().replaceAll(keeping);
+            log.info("Charge point '{}' kept {} charging profile(s) across the redefinition.",
+                    replacement.getChargePointId(), keeping.size());
         }
     }
 

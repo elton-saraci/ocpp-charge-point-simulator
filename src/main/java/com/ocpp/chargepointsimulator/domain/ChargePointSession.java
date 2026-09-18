@@ -28,6 +28,11 @@ public class ChargePointSession {
     @Getter
     private final ChargePointConfig config;
     private final Map<Integer, ConnectorState> connectors;
+    /** The charging profiles the central system pushed to this charge point. */
+    @Getter
+    private final ChargingProfileStore chargingProfiles = new ChargingProfileStore();
+    /** When the oldest connector of this charge point started charging, used by Relative profiles. */
+    private volatile Instant lastTransactionStart;
 
     private volatile JSONClient client;
     @Getter
@@ -72,6 +77,37 @@ public class ChargePointSession {
 
     public Collection<ConnectorState> getConnectors() {
         return connectors.values();
+    }
+
+    /** @return connector id to the id of the transaction running on it, for TxProfile validation. */
+    public Map<Integer, Integer> runningTransactions() {
+        Map<Integer, Integer> running = new LinkedHashMap<>();
+        connectors.forEach((connectorId, connector) -> {
+            Integer transactionId = connector.getTransactionId();
+            if (transactionId != null) {
+                running.put(connectorId, transactionId);
+            }
+        });
+        return running;
+    }
+
+    /**
+     * Remembers when a transaction started, which is the anchor of a {@code Relative} charging
+     * schedule. The value survives until the last transaction of this charge point is over.
+     */
+    public void transactionStarted(Instant startedAt) {
+        this.lastTransactionStart = startedAt;
+    }
+
+    /** @return start of the running transaction, or of the last one when nothing charges. */
+    public Instant transactionStart() {
+        for (ConnectorState connector : connectors.values()) {
+            Instant startedAt = connector.getTransactionStartedAt();
+            if (startedAt != null) {
+                return startedAt;
+            }
+        }
+        return lastTransactionStart;
     }
 
     /** @throws ConnectorNotFoundException when this charge point does not expose the connector. */

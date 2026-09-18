@@ -61,7 +61,7 @@ public class ChargePointRemoteTriggerHandler implements ClientRemoteTriggerEvent
 
     private void sendMeterValues(Integer requestedConnectorId) {
         List<ConnectorState> chargingConnectors = targetConnectors(requestedConnectorId).stream()
-                .filter(ConnectorState::isCharging)
+                .filter(ConnectorState::hasTransaction)
                 .toList();
         if (chargingConnectors.isEmpty()) {
             log.info("[{}] No charging connector, no MeterValues to trigger.", session.getChargePointId());
@@ -69,7 +69,10 @@ public class ChargePointRemoteTriggerHandler implements ClientRemoteTriggerEvent
         }
         for (ConnectorState connector : chargingConnectors) {
             connector.markMeterValuesSent(System.currentTimeMillis());
-            requestSender.send(session, messageFactory.meterValues(session.getConfig(), connector));
+            // Report the power the charging profiles allow, which is zero while suspended.
+            Integer limit = connector.getChargingLimitW();
+            int powerW = limit == null ? session.getConfig().chargingPower() : limit;
+            requestSender.send(session, messageFactory.meterValues(session.getConfig(), connector, powerW));
         }
     }
 

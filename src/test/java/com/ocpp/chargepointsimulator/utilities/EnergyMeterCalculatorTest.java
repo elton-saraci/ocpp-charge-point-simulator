@@ -28,8 +28,14 @@ class EnergyMeterCalculatorTest {
     }
 
     @Test
-    void rejectsNonPositiveInputs() {
-        assertThrows(IllegalArgumentException.class, () -> EnergyMeterCalculator.energyStepWh(0, 60));
+    void aSuspendedConnectorAddsNoEnergy() {
+        // A charging profile can hold a connector at zero watt: the register must stay where it is.
+        assertEquals(0, EnergyMeterCalculator.energyStepWh(0, 60));
+        assertEquals(0, EnergyMeterCalculator.energyStepWh(0, 3600));
+    }
+
+    @Test
+    void rejectsNegativeOrNonPositiveIntervals() {
         assertThrows(IllegalArgumentException.class, () -> EnergyMeterCalculator.energyStepWh(-5000, 60));
         assertThrows(IllegalArgumentException.class, () -> EnergyMeterCalculator.energyStepWh(5000, 0));
         assertThrows(IllegalArgumentException.class, () -> EnergyMeterCalculator.energyStepWh(5000, -60));
