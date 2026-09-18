@@ -27,6 +27,11 @@
 		     falls back to a legacy level, cannot parse records, and reports phantom
 		     "cannot be resolved" errors for every record type. -->
 		<maven.compiler.release>${java.version}</maven.compiler.release>
+		<!-- CVE-2025-48924 / GHSA-j288-q9x7-2f5v: uncontrolled recursion in commons-lang3
+		     below 3.18.0. Spring Boot 3.5.x manages 3.17.0 and springdoc pulls it in
+		     transitively, so override the BOM property. Remove once Spring Boot itself
+		     manages >= 3.18.0. -->
+		<commons-lang3.version>3.18.0</commons-lang3.version>
 	</properties>
 	<dependencies>
 		<dependency>

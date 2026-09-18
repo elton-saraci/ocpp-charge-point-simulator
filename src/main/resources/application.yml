@@ -25,3 +25,13 @@ simulator:
 server:
   # Bind to the PORT env var when provided (e.g. by container platforms); fall back to 8080 for local runs.
   port: ${PORT:8080}
+
+spring:
+  web:
+    resources:
+      cache:
+        cachecontrol:
+          # The console is served by this same app with no build step and no asset hashing, so make
+          # browsers revalidate index.html/app.css/app.js. Without this Spring sends only
+          # Last-Modified and browsers may keep running a stale bundle after an upgrade.
+          no-cache: true

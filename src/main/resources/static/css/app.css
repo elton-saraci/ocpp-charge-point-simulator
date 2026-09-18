@@ -137,7 +137,7 @@ a:hover { text-decoration: underline; }
     position: sticky;
     top: 0;
     z-index: 10;
-    background: color-mix(in srgb, var(--bg) 86%, transparent);
+    background: color-mix(in srgb, var(--bg) 92%, transparent);
     backdrop-filter: blur(14px);
     border-bottom: 1px solid color-mix(in srgb, var(--accent) 12%, var(--line));
 }
@@ -145,42 +145,54 @@ a:hover { text-decoration: underline; }
 .topbar__inner {
     max-width: 1460px;
     margin: 0 auto;
-    padding: var(--s-3) var(--s-5);
+    padding: var(--s-4) var(--s-5);
     display: flex;
     align-items: center;
     gap: var(--s-5);
 }
 
-.brand { display: flex; align-items: center; gap: var(--s-3); min-width: 0; }
+/* brand lockup: mark, wordmark, app chip */
+.brand { display: flex; align-items: center; gap: var(--s-4); min-width: 0; }
 
 .brand__mark { display: grid; place-items: center; flex: none; }
-.brand__mark svg { width: 34px; height: 34px; display: block; border-radius: 8px; }
+.brand__mark svg {
+    width: 40px;
+    height: 40px;
+    display: block;
+    border-radius: 11px;
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 14%, transparent);
+}
 
-.brand__text { display: flex; flex-direction: column; line-height: 1.2; }
-.brand__title { display: flex; align-items: center; gap: 8px; }
+.brand__text {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
 .brand__wordmark {
     font-family: var(--font-display);
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 600;
-    letter-spacing: -.02em;
+    letter-spacing: -.015em;
     color: #fff;
     line-height: 1;
 }
-.brand__text small {
-    color: var(--text-faint);
-    font-size: 11.5px;
-    letter-spacing: .01em;
-}
+/* app chip: emerald tint + ring around uppercase micro type */
 .brand__badge {
-    padding: 3px 9px;
-    border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line));
+    display: inline-flex;
+    align-items: center;
+    height: 20px;
+    padding: 0 10px;
+    border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--line));
     border-radius: var(--r-pill);
+    background: color-mix(in srgb, var(--accent) 9%, transparent);
     color: var(--accent);
     font-family: var(--font);
-    font-size: 10px;
-    font-weight: 500;
+    font-size: 9.5px;
+    font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: .1em;
+    letter-spacing: .14em;
+    text-indent: .14em; /* balances the trailing letter-spacing inside the pill */
     line-height: 1;
 }
 
@@ -188,7 +200,8 @@ a:hover { text-decoration: underline; }
     display: flex;
     gap: var(--s-5);
     margin: 0 0 0 auto;
-    padding: 0;
+    padding: 0 0 0 var(--s-6);
+    border-left: 1px solid var(--line);
 }
 .metric { display: flex; flex-direction: column; gap: 2px; }
 .metric dt {
@@ -313,6 +326,20 @@ main {
     transform: translateY(-2px);
     box-shadow: var(--shadow-2);
 }
+
+/* The whole card is a hit area: an invisible button is stretched across it, so the card
+   is keyboard reachable (Tab + Enter) while the footer controls keep working — they are
+   raised above it by the paint order below. Reuses the existing data-action="control". */
+.card__open {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    border-radius: inherit;
+    cursor: pointer;
+}
 .card.is-offline { border-left: 2px solid var(--idle); }
 .card.is-online { border-left: 2px solid var(--accent); }
 .card.is-charging {
@@ -383,6 +410,8 @@ main {
 }
 
 .card__foot {
+    position: relative;
+    z-index: 1; /* above the card-wide hit area so these buttons remain the target */
     display: flex;
     gap: var(--s-2);
     padding: var(--s-3) var(--s-4);
@@ -862,27 +891,53 @@ input[aria-invalid="true"] { border-color: var(--danger); }
 .footer__inner {
     max-width: 1460px;
     margin: 0 auto;
-    padding: var(--s-5);
+    padding: var(--s-6) var(--s-5);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--s-4);
+    gap: var(--s-5);
     flex-wrap: wrap;
     font-size: 12px;
     color: var(--text-faint);
 }
 
-.footer__brand { display: flex; align-items: center; gap: var(--s-3); }
-.footer__brand svg { width: 22px; height: 22px; border-radius: 6px; display: block; }
-.footer__brand strong {
+/* mirrors the header lockup so the top and bottom read as one design */
+.footer__brand { display: flex; align-items: center; gap: var(--s-4); }
+.footer__brand svg { width: 30px; height: 30px; border-radius: 8px; display: block; }
+.footer__text { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.footer__text strong {
     font-family: var(--font-display);
-    font-size: 14px;
+    font-size: 15px;
+    line-height: 1;
+    letter-spacing: -.01em;
     color: var(--text);
     font-weight: 600;
 }
-.footer__tagline { color: var(--accent); }
-.footer__credit { display: flex; flex-direction: column; gap: 2px; }
+.footer__sub {
+    color: var(--text-faint);
+    font-size: 11px;
+    line-height: 1;
+    letter-spacing: .045em;
+}
+.footer__credit {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    text-align: right;
+    line-height: 1.35;
+}
 .footer__credit span { color: var(--text-faint); }
+.footer__credit a {
+    color: var(--text-dim);
+    border-bottom: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+    padding-bottom: 1px;
+    transition: color var(--t-fast), border-color var(--t-fast);
+}
+.footer__credit a:hover {
+    color: var(--accent-bright);
+    border-bottom-color: color-mix(in srgb, var(--accent) 60%, transparent);
+    text-decoration: none;
+}
 
 /* ------------------------------------------------------------------- motion */
 
@@ -915,14 +970,23 @@ input[aria-invalid="true"] { border-color: var(--danger); }
 }
 
 @media (max-width: 900px) {
-    .topbar__inner { flex-wrap: wrap; gap: var(--s-3); }
-    .metrics { order: 3; width: 100%; margin-left: 0; gap: var(--s-5); }
+    .topbar__inner { flex-wrap: wrap; gap: var(--s-4); padding: var(--s-3) var(--s-4); }
+    .metrics {
+        order: 3;
+        width: 100%;
+        margin-left: 0;
+        gap: var(--s-5);
+        padding-left: 0;
+        border-left: none;
+    }
     main { padding: var(--s-4); }
-    .footer__inner { padding: var(--s-4); }
+    .footer__inner { padding: var(--s-5) var(--s-4); }
+    .footer__credit { text-align: left; }
 }
 
 @media (max-width: 620px) {
     .form-grid { grid-template-columns: 1fr; }
     .card__meta { gap: var(--s-4); }
     .toasts { left: var(--s-4); right: var(--s-4); max-width: none; }
+    .footer__inner { flex-direction: column; align-items: flex-start; gap: var(--s-5); }
 }

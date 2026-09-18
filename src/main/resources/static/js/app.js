@@ -406,6 +406,10 @@
     function stationCard(station) {
         return `
         <article class="card" data-id="${escapeHtml(station.chargePointId)}">
+            <button type="button" class="card__open" data-action="control"
+                    data-id="${escapeHtml(station.chargePointId)}"
+                    aria-label="Open the control view for ${escapeHtml(station.chargePointId)}"
+                    title="${escapeHtml(station.webSocketUrl)}"></button>
             <header class="card__head">
                 <div class="card__titles">
                     <div class="card__id">${escapeHtml(station.chargePointId)}</div>
