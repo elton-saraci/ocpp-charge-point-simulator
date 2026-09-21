@@ -71,6 +71,13 @@
                     <span class="field__label">Filter</span>
                     <input id="filter" type="search" placeholder="id or URL" autocomplete="off"/>
                 </label>
+                <button type="button" class="btn" id="toggle-fleet-log" aria-expanded="false"
+                        aria-controls="fleet-log-panel" title="Show or hide the activity log">
+                    <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4h11M2.5 8h11M2.5 12h7"
+                          stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+                    Activity
+                    <span class="chip" id="fleet-log-count">0</span>
+                </button>
                 <button type="button" class="btn" id="refresh-fleet" title="Pull the latest state right now">
                     <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M12.5 8A4.5 4.5 0 1 1 11.2 4.9"
                           stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/><path d="M12.6 1.9v3.2H9.4"
@@ -94,7 +101,7 @@
             <button type="button" class="btn btn--primary" data-action="open-create">Add charge point</button>
         </div>
 
-        <section class="panel fleet-log" aria-labelledby="fleet-activity-title">
+        <section class="panel fleet-log" id="fleet-log-panel" hidden aria-labelledby="fleet-activity-title">
             <div class="panel__head">
                 <h2 class="panel__title" id="fleet-activity-title">Activity · all stations</h2>
                 <div class="panel__actions">

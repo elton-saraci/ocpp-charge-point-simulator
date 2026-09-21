@@ -565,6 +565,8 @@ main {
 .btn--icon { padding: 6px; }
 /* A button that is waiting on the simulator keeps its label but spins its icon. */
 .btn.is-busy .icon { animation: spin 900ms linear infinite; }
+/* A counter inside a button (the fleet activity toggle) has to sit inside its padding. */
+.btn > .chip { padding: 1px 7px; font-size: 11px; }
 .icon { width: 14px; height: 14px; flex: none; }
 
 /* ------------------------------------------------------------------ fields */

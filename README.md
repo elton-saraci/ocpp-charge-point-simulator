@@ -24,10 +24,12 @@ Open `http://localhost:8080/` after starting the simulator.
   forward buttons move between the fleet and the control rooms you visited; a link to a charge point the simulator does
   not have falls back to the fleet with a note in the activity log.
 - **Activity logs** — the control room lists the selected station's events plus the console-wide ones (a failing poll,
-  the console starting up), while the fleet view lists every station and names the station on each row. **Refresh**
-  pulls the latest state right away instead of waiting for the next poll tick, **Export** downloads the list as CSV
-  (`timestamp, level, chargePoint, message`, oldest first) so a session can be attached to a bug report or opened in a
-  spreadsheet, and **Clear** forgets the history at the same scope as the list it sits in.
+  the console starting up), and the fleet view lists every station with the station named on each row. In the fleet the
+  log stays out of the way behind the **Activity** button in the header, off by default, whose counter shows how many
+  entries are waiting; the control room always shows its own. **Refresh** pulls the latest state right away instead of
+  waiting for the next poll tick, **Export** downloads the list as CSV (`timestamp, level, chargePoint, message`, oldest
+  first) so a session can be attached to a bug report or opened in a spreadsheet, and **Clear** forgets the history at
+  the same scope as the list it sits in.
 
 It is hand-written HTML/CSS/JavaScript served from `src/main/resources/static`, so there is no Node build step and no
 second container. It refreshes from the REST API every two seconds, and editing a station rebuilds it in place: running

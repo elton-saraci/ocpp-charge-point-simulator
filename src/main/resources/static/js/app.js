@@ -29,6 +29,7 @@
         confirming: new Set(),
         log: [],
         logScope: undefined,   // scope the log lists were built for; forces one render at startup
+        showFleetLog: localStorage.getItem('ocpp.activity') === 'on',
         apiDown: false
     };
 
@@ -54,6 +55,9 @@
         rfidTag: $('#rfid-tag'),
         log: $('#log'),
         fleetLog: $('#fleet-log'),
+        fleetLogPanel: $('#fleet-log-panel'),
+        fleetLogCount: $('#fleet-log-count'),
+        toggleFleetLog: $('#toggle-fleet-log'),
         refreshFleet: $('#refresh-fleet'),
         refreshStation: $('#refresh-station'),
         refreshStationLog: $('#refresh-station-log'),
@@ -174,6 +178,28 @@
     function syncLog() {
         if (state.logScope !== logScope()) {
             renderLog();
+        }
+    }
+
+    /**
+     * The fleet keeps its log out of the way until it is asked for: the panel is hidden by default and
+     * the button in the header shows how much is waiting in it. The control room always shows its own.
+     */
+    function renderFleetLogToggle() {
+        const open = state.showFleetLog;
+        dom.fleetLogPanel.hidden = !open;
+        dom.toggleFleetLog.setAttribute('aria-expanded', String(open));
+        dom.toggleFleetLog.classList.toggle('btn--accent', open);
+        dom.fleetLogCount.textContent = state.log.length;
+    }
+
+    /** @param {boolean} open whether the fleet log is being shown, remembered across reloads */
+    function setFleetLogVisible(open) {
+        state.showFleetLog = open;
+        localStorage.setItem('ocpp.activity', open ? 'on' : 'off');
+        renderFleetLogToggle();
+        if (open) {
+            dom.fleetLogPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
     }
 
@@ -493,6 +519,7 @@
         dom.tabStation.disabled = !state.stations.length;
         dom.fleet.hidden = state.view !== 'fleet';
         dom.station.hidden = state.view !== 'station';
+        renderFleetLogToggle();
 
         if (state.view === 'fleet') {
             renderFleet();
@@ -1106,6 +1133,7 @@
     dom.refreshFleet.addEventListener('click', (event) => pullLatest(event.currentTarget));
     dom.exportStationLog.addEventListener('click', () => exportLog(state.selectedId));
     dom.exportFleetLog.addEventListener('click', () => exportLog(null));
+    dom.toggleFleetLog.addEventListener('click', () => setFleetLogVisible(!state.showFleetLog));
 
     ['chargePointId', 'centralSystemUrl', 'chargingPower', 'meterValuesFrequency',
         'connectorIds', 'username', 'password']
