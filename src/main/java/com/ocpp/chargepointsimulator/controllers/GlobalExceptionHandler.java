@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.time.Instant;
@@ -20,7 +21,7 @@ import java.time.Instant;
  *
  * <ul>
  *   <li>400 - the charge point definition is invalid</li>
- *   <li>404 - unknown charge point or connector</li>
+ *   <li>404 - unknown charge point, unknown connector, or an address that serves nothing</li>
  *   <li>409 - the charge point already exists, or it is not connected to the central system</li>
  *   <li>502 - the central system could not be reached or did not answer</li>
  *   <li>500 - anything else</li>
@@ -33,6 +34,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidChargePointConfigException.class)
     public ProblemDetail handleInvalidConfiguration(InvalidChargePointConfigException e) {
         return problem(HttpStatus.BAD_REQUEST, "Invalid charge point configuration", e);
+    }
+
+    /** A missing asset or a mistyped URL is an ordinary 404, not a simulator failure. */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ProblemDetail handleMissingResource(NoResourceFoundException e) {
+        return problem(HttpStatus.NOT_FOUND, "Unknown path", e);
     }
 
     @ExceptionHandler({ ChargePointNotFoundException.class, ConnectorNotFoundException.class })

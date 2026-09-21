@@ -6,11 +6,13 @@
     <meta name="color-scheme" content="dark"/>
     <title>Chargomate · Fleet Console</title>
     <meta name="description" content="Chargomate fleet console — run and drive simulated OCPP 1.6 charge points."/>
-    <link rel="icon" href="favicon.svg"/>
+    <link rel="icon" href="/favicon.svg"/>
     <link rel="preconnect" href="https://fonts.googleapis.com"/>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet"/>
-    <link rel="stylesheet" href="css/app.css"/>
+    <!-- Served from the application root: the console also answers deep routes such as /station/<cpId>,
+         and a relative asset path would then be resolved below that route. -->
+    <link rel="stylesheet" href="/css/app.css"/>
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
@@ -44,7 +46,7 @@
         </dl>
 
         <nav class="tabs" aria-label="Views">
-            <button type="button" class="tab is-active" data-view="fleet" aria-current="page">Fleet</button>
+            <button type="button" class="tab is-active" id="tab-fleet" data-view="fleet" aria-current="page">Fleet</button>
             <button type="button" class="tab" data-view="station" id="tab-station" disabled>Control</button>
         </nav>
     </div>
@@ -69,6 +71,13 @@
                     <span class="field__label">Filter</span>
                     <input id="filter" type="search" placeholder="id or URL" autocomplete="off"/>
                 </label>
+                <button type="button" class="btn" id="refresh-fleet" title="Pull the latest state right now">
+                    <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M12.5 8A4.5 4.5 0 1 1 11.2 4.9"
+                          stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/><path d="M12.6 1.9v3.2H9.4"
+                          stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
+                          fill="none"/></svg>
+                    Refresh
+                </button>
                 <button type="button" class="btn btn--primary" data-action="open-create">
                     <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10"
                           stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
@@ -84,12 +93,43 @@
             <p id="empty-body">Register a charge point to open an OCPP session against your central system.</p>
             <button type="button" class="btn btn--primary" data-action="open-create">Add charge point</button>
         </div>
+
+        <section class="panel fleet-log" aria-labelledby="fleet-activity-title">
+            <div class="panel__head">
+                <h2 class="panel__title" id="fleet-activity-title">Activity · all stations</h2>
+                <div class="panel__actions">
+                    <button type="button" class="btn btn--ghost btn--sm" id="refresh-fleet-log"
+                            title="Pull the latest state right now">
+                        <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M12.5 8A4.5 4.5 0 1 1 11.2 4.9"
+                              stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/><path d="M12.6 1.9v3.2H9.4"
+                              stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
+                              fill="none"/></svg>
+                        Refresh
+                    </button>
+                    <button type="button" class="btn btn--ghost btn--sm" id="export-fleet-log"
+                            title="Download this log as CSV (newest 200 entries)">
+                        <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v7m0 0 2.8-2.8M8 9.5 5.2 6.7M3 12.5h10"
+                              stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
+                              fill="none"/></svg>
+                        Export
+                    </button>
+                    <button type="button" class="btn btn--ghost btn--sm" id="clear-fleet-log">Clear</button>
+                </div>
+            </div>
+            <ol class="log log--all" id="fleet-log"></ol>
+        </section>
     </section>
 
     <!-- ---------------------------------------------------------- control room -->
     <section class="view" id="view-station" hidden aria-labelledby="station-title">
         <header class="view__head">
             <div>
+                <button type="button" class="view__back" data-action="back">
+                    <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 3.5 5 8l4.5 4.5"
+                          stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
+                          fill="none"/></svg>
+                    Back to fleet
+                </button>
                 <p class="eyebrow">Station control</p>
                 <h1 id="station-title">—</h1>
                 <p class="view__sub" id="station-sub">—</p>
@@ -99,6 +139,13 @@
                     <span class="field__label">Station</span>
                     <select id="station-picker"></select>
                 </label>
+                <button type="button" class="btn" id="refresh-station" title="Pull the latest state right now">
+                    <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M12.5 8A4.5 4.5 0 1 1 11.2 4.9"
+                          stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/><path d="M12.6 1.9v3.2H9.4"
+                          stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
+                          fill="none"/></svg>
+                    Refresh
+                </button>
                 <button type="button" class="btn" id="station-edit">Edit</button>
                 <button type="button" class="btn" id="station-toggle">Connect</button>
                 <button type="button" class="btn btn--danger" id="station-remove">Remove</button>
@@ -131,11 +178,37 @@
                 <section class="panel panel--fill" aria-labelledby="activity-title">
                     <div class="panel__head">
                         <h2 class="panel__title" id="activity-title">Activity</h2>
-                        <button type="button" class="btn btn--ghost btn--sm" id="clear-log">Clear</button>
+                        <div class="panel__actions">
+                            <button type="button" class="btn btn--ghost btn--sm" id="refresh-station-log"
+                                    title="Pull the latest state right now">
+                                <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M12.5 8A4.5 4.5 0 1 1 11.2 4.9"
+                                      stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/><path d="M12.6 1.9v3.2H9.4"
+                                      stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
+                                      fill="none"/></svg>
+                                Refresh
+                            </button>
+                            <button type="button" class="btn btn--ghost btn--sm" id="export-station-log"
+                                    title="Download this station's log as CSV (newest 200 entries)">
+                                <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v7m0 0 2.8-2.8M8 9.5 5.2 6.7M3 12.5h10"
+                                      stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
+                                      fill="none"/></svg>
+                                Export
+                            </button>
+                            <button type="button" class="btn btn--ghost btn--sm" id="clear-station-log">Clear</button>
+                        </div>
                     </div>
                     <ol class="log" id="log"></ol>
                 </section>
             </aside>
+        </div>
+
+        <div class="view__foot">
+            <button type="button" class="btn btn--ghost btn--sm" data-action="back">
+                <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 3.5 5 8l4.5 4.5"
+                      stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
+                      fill="none"/></svg>
+                Back to fleet
+            </button>
         </div>
     </section>
 </main>
@@ -237,6 +310,6 @@
 
 <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
 
-<script src="js/app.js" defer></script>
+<script src="/js/app.js" defer></script>
 </body>
 </html>

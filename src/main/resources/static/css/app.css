@@ -280,6 +280,35 @@ main {
 .view__sub { color: var(--text-dim); font-size: 13px; margin-top: 4px; }
 .view__tools { display: flex; align-items: flex-end; gap: var(--s-2); flex-wrap: wrap; }
 
+/* Way back out of the control room: a quiet pill above the eyebrow, plus the same action at the
+   bottom of the page, which is a long scroll away because of the connectors and the log. */
+.view__back {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 10px;
+    padding: 4px 11px 4px 7px;
+    font: inherit;
+    font-family: var(--font-display);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--text-dim);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--r-pill);
+    cursor: pointer;
+    transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+}
+.view__back:hover {
+    background: var(--surface-3);
+    border-color: color-mix(in srgb, var(--accent) 26%, var(--line));
+    color: var(--accent);
+}
+
+.view__foot { display: flex; justify-content: center; margin-top: var(--s-5); }
+
 .banner {
     position: relative;
     display: flex;
@@ -534,6 +563,8 @@ main {
 
 .btn--sm { padding: 5px 12px; font-size: 12px; }
 .btn--icon { padding: 6px; }
+/* A button that is waiting on the simulator keeps its label but spins its icon. */
+.btn.is-busy .icon { animation: spin 900ms linear infinite; }
 .icon { width: 14px; height: 14px; flex: none; }
 
 /* ------------------------------------------------------------------ fields */
@@ -604,6 +635,7 @@ input[aria-invalid="true"] { border-color: var(--danger); }
     color: var(--text-faint);
     font-weight: 600;
 }
+.panel__actions { display: flex; align-items: center; gap: var(--s-1); }
 
 .kv {
     display: grid;
@@ -771,6 +803,14 @@ input[aria-invalid="true"] { border-color: var(--danger); }
 .log__row[data-level="error"] { border-left-color: color-mix(in srgb, var(--danger) 60%, transparent); }
 .log__row[data-level="error"] .log__msg { color: var(--danger); }
 .log__empty { padding: var(--s-4); color: var(--text-faint); font-family: var(--font); }
+
+/* The fleet log aggregates every station, so each row names the station it came from and the list
+   gets a height of its own — it sits under the card grid instead of filling a sticky sidebar. */
+.log--all { max-height: 340px; }
+.log--all .log__row { grid-template-columns: 58px minmax(72px, 140px) 1fr; }
+.log__cp { color: var(--accent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.fleet-log { margin-top: var(--s-5); }
 
 /* ------------------------------------------------------------------ dialog */
 
@@ -959,6 +999,9 @@ input[aria-invalid="true"] { border-color: var(--danger); }
 @keyframes slide {
     from { opacity: 0; transform: translateX(14px); }
     to { opacity: 1; transform: none; }
+}
+@keyframes spin {
+    to { transform: rotate(360deg); }
 }
 
 @media (prefers-reduced-motion: reduce) {

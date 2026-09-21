@@ -19,6 +19,15 @@ Open `http://localhost:8080/` after starting the simulator.
 - **Control** — one station in detail: its definition, a connector panel per connector with a power gauge, energy
   register, live session timer and an energy trend, buttons to plug in, tap a card and plug out, plus an activity feed
   that turns the polled state into a readable story (status transitions, transaction start/stop, errors).
+- **Deep links** — the control room of a charge point has an address of its own, `/station/<charge-point-id>` (for
+  example `/station/CP_SIM_001`), so it can be bookmarked, shared and reloaded without losing the station. The back and
+  forward buttons move between the fleet and the control rooms you visited; a link to a charge point the simulator does
+  not have falls back to the fleet with a note in the activity log.
+- **Activity logs** — the control room lists the selected station's events plus the console-wide ones (a failing poll,
+  the console starting up), while the fleet view lists every station and names the station on each row. **Refresh**
+  pulls the latest state right away instead of waiting for the next poll tick, **Export** downloads the list as CSV
+  (`timestamp, level, chargePoint, message`, oldest first) so a session can be attached to a bug report or opened in a
+  spreadsheet, and **Clear** forgets the history at the same scope as the list it sits in.
 
 It is hand-written HTML/CSS/JavaScript served from `src/main/resources/static`, so there is no Node build step and no
 second container. It refreshes from the REST API every two seconds, and editing a station rebuilds it in place: running

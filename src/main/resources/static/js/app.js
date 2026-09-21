@@ -6,13 +6,15 @@
 (() => {
     'use strict';
 
-    const API = 'api/charge-points';
+    const API = '/api/charge-points';
     const POLL_MS = 2000;
     const GAUGE_RADIUS = 52;
     const GAUGE_CIRCUMFERENCE = 2 * Math.PI * GAUGE_RADIUS;
     const POWER_SCALE_W = 22000;   // visual scale of the power gauge (AC ceiling)
     const HISTORY_POINTS = 40;
     const MAX_LOG_ROWS = 200;
+    const ALL_LOG_EMPTY = 'Actions and observed state changes of every station show up here.';
+    const STATION_LOG_EMPTY = 'Local actions and observed state changes of this station show up here.';
     const CONFIRM_TIMEOUT_MS = 5000;
 
     const state = {
@@ -26,6 +28,7 @@
         busy: new Set(),
         confirming: new Set(),
         log: [],
+        logScope: undefined,   // scope the log lists were built for; forces one render at startup
         apiDown: false
     };
 
@@ -50,6 +53,16 @@
         connectors: $('#connectors'),
         rfidTag: $('#rfid-tag'),
         log: $('#log'),
+        fleetLog: $('#fleet-log'),
+        refreshFleet: $('#refresh-fleet'),
+        refreshStation: $('#refresh-station'),
+        refreshStationLog: $('#refresh-station-log'),
+        refreshFleetLog: $('#refresh-fleet-log'),
+        exportStationLog: $('#export-station-log'),
+        exportFleetLog: $('#export-fleet-log'),
+        clearStationLog: $('#clear-station-log'),
+        clearFleetLog: $('#clear-fleet-log'),
+        tabFleet: $('#tab-fleet'),
         tabStation: $('#tab-station'),
         stationEdit: $('#station-edit'),
         stationToggle: $('#station-toggle'),
@@ -96,36 +109,117 @@
 
     /* -------------------------------------------------------------- activity */
 
-    function logRow(entry) {
+    function logRow(entry, withStation) {
         const row = document.createElement('li');
         row.className = 'log__row';
         row.dataset.level = entry.level;
         row.innerHTML = `<span class="log__time">${formatClock(entry.at)}</span>`
+            + (withStation && entry.chargePointId
+                ? `<span class="log__cp" title="${escapeHtml(entry.chargePointId)}">`
+                    + `${escapeHtml(entry.chargePointId)}</span>`
+                : '')
             + `<span class="log__msg">${escapeHtml(entry.message)}</span>`;
         return row;
     }
 
-    function addLog(level, message) {
-        const entry = { at: new Date(), level, message };
+    /** What the control-room log is scoped to; null in the fleet view, whose log shows everything. */
+    const logScope = () => (state.view === 'station' ? state.selectedId : null);
+
+    /**
+     * Entries of one charge point, plus the console-wide ones (polling failures, readiness), which
+     * are not about any single station and therefore belong in every log.
+     */
+    const logEntriesFor = (chargePointId) => (chargePointId
+        ? state.log.filter((entry) => !entry.chargePointId || entry.chargePointId === chargePointId)
+        : state.log);
+
+    function addLog(level, message, chargePointId = null) {
+        const entry = { at: new Date(), level, message, chargePointId };
         state.log.unshift(entry);
         if (state.log.length > MAX_LOG_ROWS) {
             state.log.length = MAX_LOG_ROWS;
         }
-        // prepend only the new row: re-rendering the list would replay its animation
-        dom.log.querySelector('.log__empty')?.remove();
-        dom.log.prepend(logRow(entry));
-        while (dom.log.children.length > MAX_LOG_ROWS) {
-            dom.log.lastElementChild.remove();
+        // prepend only the new row: re-rendering a list would replay its entrance animations
+        liveLog(dom.fleetLog, entry, true);
+        if (!chargePointId || chargePointId === logScope()) {
+            liveLog(dom.log, entry, false);
         }
     }
 
-    function renderLog() {
-        dom.log.innerHTML = '';
-        if (!state.log.length) {
-            dom.log.innerHTML = '<li class="log__empty">Local actions and observed state changes show up here.</li>';
+    /** Adds one row on top of a list, keeping its placeholder and its cap in sync. */
+    function liveLog(list, entry, withStation) {
+        list.querySelector('.log__empty')?.remove();
+        list.prepend(logRow(entry, withStation));
+        while (list.children.length > MAX_LOG_ROWS) {
+            list.lastElementChild.remove();
+        }
+    }
+
+    function renderLogInto(list, entries, emptyText, withStation) {
+        list.innerHTML = '';
+        if (!entries.length) {
+            list.innerHTML = `<li class="log__empty">${escapeHtml(emptyText)}</li>`;
             return;
         }
-        state.log.forEach((entry) => dom.log.append(logRow(entry)));
+        entries.forEach((entry) => list.append(logRow(entry, withStation)));
+    }
+
+    function renderLog() {
+        renderLogInto(dom.fleetLog, state.log, ALL_LOG_EMPTY, true);
+        renderLogInto(dom.log, logEntriesFor(state.selectedId), STATION_LOG_EMPTY, false);
+        state.logScope = logScope();
+    }
+
+    /** Rebuilds the lists only when the scope changed, so live rows never restart their animation. */
+    function syncLog() {
+        if (state.logScope !== logScope()) {
+            renderLog();
+        }
+    }
+
+    /** RFC 4180: a field is quoted when it holds a comma, a quote or a line break. */
+    const csvCell = (value) => {
+        const text = String(value ?? '');
+        return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    };
+
+    /** A file name that survives Windows and the shell: no colons, nothing exotic. */
+    const exportName = (chargePointId) => {
+        const scope = (chargePointId ?? 'all-stations').replace(/[^A-Za-z0-9._-]+/g, '_');
+        const stamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+        return `activity-${scope}-${stamp}.csv`;
+    };
+
+    /** Hands text to the browser as a download; no server round trip and nothing to clean up. */
+    function download(text, name) {
+        const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = name;
+        document.body.append(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+    }
+
+    /**
+     * Downloads what a log shows, oldest entry first so the file reads chronologically. The panels keep
+     * the newest MAX_LOG_ROWS entries and show them on top, so the file covers exactly that window.
+     */
+    function exportLog(chargePointId) {
+        const entries = logEntriesFor(chargePointId);
+        if (!entries.length) {
+            toast('error', 'Nothing to export', 'The activity log is empty.');
+            return;
+        }
+        const rows = [['timestamp', 'level', 'chargePoint', 'message'], ...[...entries].reverse().map((entry) => [
+            entry.at.toISOString(), entry.level, entry.chargePointId ?? '', entry.message
+        ])];
+        const name = exportName(chargePointId);
+        download(rows.map((row) => row.map(csvCell).join(',')).join('\r\n'), name);
+        addLog('info', `Exported ${entries.length} log ${entries.length === 1 ? 'entry' : 'entries'} to ${name}`,
+            chargePointId);
+        toast('ok', 'Log exported', name);
     }
 
     function toast(level, title, detail) {
@@ -170,7 +264,8 @@
 
     /* --------------------------------------------------------------- actions */
 
-    async function run(actionKey, action, successMessage) {
+    /** Runs a REST action and logs its outcome against the charge point it belongs to. */
+    async function run(actionKey, action, { successMessage = null, chargePointId = null } = {}) {
         if (state.busy.has(actionKey)) {
             return undefined;
         }
@@ -179,13 +274,13 @@
         try {
             const result = await action();
             if (successMessage) {
-                addLog('ok', successMessage);
+                addLog('ok', successMessage, chargePointId);
                 toast('ok', successMessage);
             }
             await refresh();
             return result;
         } catch (error) {
-            addLog('error', `${actionKey}: ${error.message}`);
+            addLog('error', `${actionKey}: ${error.message}`, chargePointId);
             toast('error', 'Request failed', error.message);
             return undefined;
         } finally {
@@ -194,26 +289,34 @@
         }
     }
 
-    const createStation = (payload) => run('create', () => api('POST', API, payload),
-        `Charge point ${payload.chargePointId} registered`);
+    const createStation = (payload) => run('create', () => api('POST', API, payload), {
+        successMessage: `Charge point ${payload.chargePointId} registered`,
+        chargePointId: payload.chargePointId
+    });
 
     const updateStation = (chargePointId, payload) => run(`update:${chargePointId}`,
-        () => api('PUT', withParams(API, { cpId: chargePointId }), payload),
-        `Charge point ${chargePointId} updated`);
+        () => api('PUT', withParams(API, { cpId: chargePointId }), payload), {
+            successMessage: `Charge point ${chargePointId} updated`,
+            chargePointId
+        });
 
     const removeStation = (chargePointId) => run(`remove:${chargePointId}`,
-        () => api('DELETE', withParams(API, { cpId: chargePointId })),
-        `Charge point ${chargePointId} removed`);
+        () => api('DELETE', withParams(API, { cpId: chargePointId })), {
+            successMessage: `Charge point ${chargePointId} removed`,
+            chargePointId
+        });
 
     const connectStation = (chargePointId) => run(`connect:${chargePointId}`, async () => {
         const session = await api('POST', withParams(`${API}/connect`, { cpId: chargePointId }));
-        addLog('live', `${chargePointId} connecting to ${session.webSocketUrl}`);
+        addLog('live', `${chargePointId} connecting to ${session.webSocketUrl}`, chargePointId);
         return session;
-    });
+    }, { chargePointId });
 
     const disconnectStation = (chargePointId) => run(`disconnect:${chargePointId}`,
-        () => api('POST', withParams(`${API}/disconnect`, { cpId: chargePointId })),
-        `${chargePointId} disconnected`);
+        () => api('POST', withParams(`${API}/disconnect`, { cpId: chargePointId })), {
+            successMessage: `${chargePointId} disconnected`,
+            chargePointId
+        });
 
     function connectorAction(station, connectorId, action, idTag) {
         const actionKey = `${action}:${connectorKey(station.chargePointId, connectorId)}`;
@@ -225,13 +328,15 @@
                     throw new Error(`card ${idTag} refused by the central system (${result.centralSystemStatus})`);
                 }
                 rememberTag(idTag);
-                addLog('ok', `${station.chargePointId} #${connectorId} authorized card ${idTag}`);
+                addLog('ok', `${station.chargePointId} #${connectorId} authorized card ${idTag}`,
+                    station.chargePointId);
                 return result;
             }
             addLog(action === 'plug-in' ? 'live' : 'warn',
-                `${station.chargePointId} #${connectorId} cable ${action === 'plug-in' ? 'plugged in' : 'unplugged'}`);
+                `${station.chargePointId} #${connectorId} cable ${action === 'plug-in' ? 'plugged in' : 'unplugged'}`,
+                station.chargePointId);
             return api('POST', withParams(`${API}/connectors/${action}`, { cpId: station.chargePointId, connectorId }));
-        });
+        }, { chargePointId: station.chargePointId });
     }
 
     function rememberTag(idTag) {
@@ -260,6 +365,23 @@
         render();
     }
 
+    /**
+     * Pulls the latest state right now instead of waiting for the next tick. The log only grows when a
+     * poll observes a change, and polling pauses while the tab is in the background, so a manual pull
+     * is the way to see what the charge points did in the meantime.
+     */
+    async function pullLatest(button) {
+        button.disabled = true;
+        button.classList.add('is-busy');
+        try {
+            await refresh();
+            renderLog();
+        } finally {
+            button.classList.remove('is-busy');
+            button.disabled = false;
+        }
+    }
+
     /** Turns plain polling into readable history: transitions, transactions, errors. */
     function detectChanges(stations) {
         const seen = new Set();
@@ -272,12 +394,13 @@
             const wasConnected = state.previous.get(connectionKey);
             if (wasConnected !== undefined && wasConnected !== station.connected) {
                 addLog(station.connected ? 'ok' : 'warn',
-                    `${station.chargePointId} ${station.connected ? 'session opened' : 'session closed'}`);
+                    `${station.chargePointId} ${station.connected ? 'session opened' : 'session closed'}`,
+                    station.chargePointId);
             }
             state.previous.set(connectionKey, station.connected);
 
             if (station.lastError && state.previous.get(errorKey) !== station.lastError) {
-                addLog('error', `${station.chargePointId}: ${station.lastError}`);
+                addLog('error', `${station.chargePointId}: ${station.lastError}`, station.chargePointId);
             }
             state.previous.set(errorKey, station.lastError ?? null);
 
@@ -288,15 +411,17 @@
 
                 if (before && before.status !== connector.status) {
                     addLog(connector.status === 'Charging' ? 'live' : 'ok',
-                        `${station.chargePointId} #${connector.connectorId} ${before.status} → ${connector.status}`);
+                        `${station.chargePointId} #${connector.connectorId} ${before.status} → ${connector.status}`,
+                        station.chargePointId);
                 }
                 if (!before || before.transactionId !== connector.transactionId) {
                     if (connector.transactionId) {
                         addLog('live', `${station.chargePointId} #${connector.connectorId} transaction `
-                            + `${connector.transactionId} started for ${connector.idTag}`);
+                            + `${connector.transactionId} started for ${connector.idTag}`, station.chargePointId);
                     } else if (before?.transactionId) {
                         addLog('ok', `${station.chargePointId} #${connector.connectorId} transaction `
-                            + `${before.transactionId} ended · register ${formatWh(connector.meterValueWh)}`);
+                            + `${before.transactionId} ended · register ${formatWh(connector.meterValueWh)}`,
+                            station.chargePointId);
                     }
                 }
                 state.previous.set(id, { status: connector.status, transactionId: connector.transactionId });
@@ -328,6 +453,13 @@
     document.addEventListener('visibilitychange', () => {
         if (!document.hidden) {
             refresh();
+        }
+    });
+
+    // Back and forward move between the fleet and the control rooms the user visited.
+    window.addEventListener('popstate', () => {
+        if (!applyRoute() && state.view !== 'fleet') {
+            switchView('fleet');
         }
     });
 
@@ -367,6 +499,7 @@
         } else {
             renderControl();
         }
+        syncLog();
     }
 
     /* ----------------------------------------------------------------- fleet */
@@ -393,6 +526,7 @@
         }
         // patched either way, so a freshly inserted card is never a poll behind
         visible.forEach((station, index) => updateStationCard(dom.grid.children[index], station));
+        pushRoute(null);
     }
 
     function connectorChips(station) {
@@ -498,6 +632,7 @@
             state.selectedId = station.chargePointId;
             localStorage.setItem('ocpp.selected', station.chargePointId);
         }
+        pushRoute(station.chargePointId);
 
         const options = state.stations.map((candidate) => `
             <option value="${escapeHtml(candidate.chargePointId)}"
@@ -786,6 +921,72 @@
         }, CONFIRM_TIMEOUT_MS);
     }
 
+    /* ----------------------------------------------------------------- routes */
+
+    /**
+     * Where the console is served from. The assets and the REST API are addressed from the application
+     * root rather than relative to the page, so a deep route cannot shift them; the routes below are
+     * built from the same root.
+     */
+    const APP_ROOT = '/';
+
+    /** Path segment that introduces the control room of one charge point: /station/<cpId>. */
+    const ROUTE_SEGMENT = 'station';
+
+    const stationPath = (chargePointId) =>
+        `${APP_ROOT}${ROUTE_SEGMENT}/${encodeURIComponent(chargePointId)}`;
+
+    /** @return the charge point the address bar asks for, null when it points at the fleet. */
+    function routeStationId() {
+        const [segment, chargePointId] = location.pathname.slice(APP_ROOT.length).split('/').filter(Boolean);
+        return segment === ROUTE_SEGMENT && chargePointId ? decodeURIComponent(chargePointId) : null;
+    }
+
+    // Read before the first render, which writes the fleet into the address bar.
+    let deepLink = routeStationId();
+    // The address bar is only written once a deep link had its chance to be applied.
+    let routeReady = false;
+
+    /** Keeps the address bar in step with the view, without stacking up history entries. */
+    function pushRoute(chargePointId) {
+        const target = chargePointId ? stationPath(chargePointId) : APP_ROOT;
+        if (routeReady && location.pathname !== target) {
+            history.pushState(null, '', target);
+        }
+    }
+
+    /** Repairs a link that cannot be honoured any more, in place instead of adding an entry. */
+    function replaceRoute(chargePointId) {
+        const target = chargePointId ? stationPath(chargePointId) : APP_ROOT;
+        if (location.pathname !== target) {
+            history.replaceState(null, '', target);
+        }
+    }
+
+    /**
+     * Applies the address bar: {@code /station/<cpId>} opens that station's control room. Called once
+     * after the first load and on every back/forward, so links and the history buttons both work.
+     *
+     * @return whether a station was opened; false means the fleet stays on screen
+     */
+    function applyRoute() {
+        const chargePointId = deepLink ?? routeStationId();
+        deepLink = null;
+        routeReady = true;
+        if (!chargePointId) {
+            return false;
+        }
+        if (!state.stations.some((station) => station.chargePointId === chargePointId)) {
+            addLog('warn', `The address bar asked for charge point '${chargePointId}', `
+                + 'which this simulator does not have.');
+            replaceRoute(null);
+            return false;
+        }
+        state.selectedId = chargePointId;
+        switchView('station');
+        return true;
+    }
+
     function switchView(view) {
         state.view = view;
         document.querySelectorAll('.tab').forEach((node) => {
@@ -794,6 +995,15 @@
             node.setAttribute('aria-current', active ? 'page' : 'false');
         });
         render();
+    }
+
+    /**
+     * Leaves the control room. The back buttons and the Escape key live inside the view that gets
+     * hidden, so focus is handed to the Fleet tab, which stays visible and means the same thing.
+     */
+    function showFleet() {
+        switchView('fleet');
+        dom.tabFleet.focus();
     }
 
     document.addEventListener('click', (event) => {
@@ -805,6 +1015,8 @@
             } else if (action === 'control') {
                 state.selectedId = id;
                 switchView('station');
+            } else if (action === 'back') {
+                showFleet();
             } else if (action === 'toggle') {
                 const station = state.stations.find((entry) => entry.chargePointId === id);
                 if (station) {
@@ -839,7 +1051,16 @@
 
     dom.picker.addEventListener('change', () => {
         state.selectedId = dom.picker.value;
-        renderControl();
+        localStorage.setItem('ocpp.selected', state.selectedId);
+        // render(), not renderControl(): the activity log is scoped to the selected station too.
+        render();
+    });
+
+    // Escape leaves the control room, unless it is closing the station dialog instead.
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && state.view === 'station' && !dom.dialog.open) {
+            showFleet();
+        }
     });
 
     dom.rfidTag.addEventListener('change', () => {
@@ -868,10 +1089,23 @@
         }
     });
 
-    $('#clear-log').addEventListener('click', () => {
+    // Clearing is scoped like the list itself: this button leaves other stations' history alone.
+    dom.clearStationLog.addEventListener('click', () => {
+        state.log = state.log.filter((entry) => !entry.chargePointId || entry.chargePointId !== state.selectedId);
+        renderLog();
+    });
+
+    dom.clearFleetLog.addEventListener('click', () => {
         state.log = [];
         renderLog();
     });
+
+    dom.refreshStationLog.addEventListener('click', (event) => pullLatest(event.currentTarget));
+    dom.refreshFleetLog.addEventListener('click', (event) => pullLatest(event.currentTarget));
+    dom.refreshStation.addEventListener('click', (event) => pullLatest(event.currentTarget));
+    dom.refreshFleet.addEventListener('click', (event) => pullLatest(event.currentTarget));
+    dom.exportStationLog.addEventListener('click', () => exportLog(state.selectedId));
+    dom.exportFleetLog.addEventListener('click', () => exportLog(null));
 
     ['chargePointId', 'centralSystemUrl', 'chargingPower', 'meterValuesFrequency',
         'connectorIds', 'username', 'password']
@@ -886,5 +1120,6 @@
         node.textContent = new Date().getFullYear();
     });
     addLog('info', `console ready — polling the simulator every ${POLL_MS / 1000} s`);
-    refresh();
+    // the first pull decides whether the address bar asks for a station of its own
+    refresh().then(applyRoute);
 })();
